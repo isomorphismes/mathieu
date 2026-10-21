@@ -107,13 +107,102 @@ static int checkpoint_tests(unsigned degree) {
     printf("PASS M%u portable checkpoint: paused motion, undo/redo, 400 continuation ticks, truncation and corruption rejection\n",degree);
     return 0;
 }
+static int rosette_tests(void) {
+    mathieu_session dance,restored; CHECK(session_initialize(&dance,24));
+    CHECK(session_tap(&dance,225,70)); CHECK(dance.grid == MATHIEU_GRID);
+    CHECK(session_tap(&dance,225,70)); CHECK(dance.grid == MATHIEU_ROSETTE);
+    CHECK(session_tap(&dance,225,70)); CHECK(dance.grid == MATHIEU_CIRCLE);
+    dance.grid ← MATHIEU_ROSETTE;
+    uint8_t saved[SESSION_CHECKPOINT_MAX];
+    size_t length ← session_checkpoint(&dance,saved,sizeof saved); CHECK(length);
+    CHECK(session_restore(&restored,saved,length)); CHECK(same_checkpoint(&dance,&restored));
+    /* Grid checkpoints keep their original MATHS02 bytes and meaning. */
+    restored.grid ← MATHIEU_GRID;
+    length ← session_checkpoint(&restored,saved,sizeof saved); CHECK(length);
+    CHECK(!memcmp(saved,"MATHS02",8)); CHECK(session_restore(&dance,saved,length));
+    CHECK(dance.grid == MATHIEU_GRID);
+    /* Five exact coordinates complete T0 union T1, then the same dancers carry
+     * it through the real generator word and both site layouts. */
+    const unsigned five[] ← {0,1,6,7,12};
+    for (unsigned index ← 0; index < 5; ++index) CHECK(session_select(&dance,five[index]));
+    uint32_t octad; CHECK(mathieu_block(&dance.action,dance.selected,&octad)); CHECK(octad == 0x0c30c3u);
+    mathieu_session before ← dance;
+    mathieu_layout_transition layout ← {MATHIEU_GRID,MATHIEU_ROSETTE,0,90};
+    for (unsigned frame ← 0; frame <= 90; ++frame) {
+        layout.frame ← frame;
+        for (unsigned point ← 0; point < 24; ++point) {
+            float x,y,again_x,again_y,grid_x,grid_y,rosette_x,rosette_y;
+            CHECK(session_position_with_layout(&dance,point,&layout,&x,&y));
+            CHECK(session_position_with_layout(&dance,point,&layout,&again_x,&again_y));
+            CHECK(x == again_x && y == again_y);
+            session_position(&dance,point,&grid_x,&grid_y);
+            restored ← dance; restored.grid ← MATHIEU_ROSETTE;
+            session_position(&restored,point,&rosette_x,&rosette_y);
+            if (!frame) CHECK(x == grid_x && y == grid_y);
+            if (frame == 90) CHECK(x == rosette_x && y == rosette_y);
+            float fraction ← (float)frame / 90; fraction ← fraction * fraction * (3 - 2 * fraction);
+            CHECK(fabsf(x - (grid_x + (rosette_x - grid_x) * fraction)) < .0001f);
+            CHECK(fabsf(y - (grid_y + (rosette_y - grid_y) * fraction)) < .0001f);
+            CHECK(x >= 28 && x <= 332 && y >= 156 && y <= 460);
+        }
+        CHECK(!memcmp(&before,&dance,sizeof dance));
+    }
+    dance.grid ← MATHIEU_ROSETTE;
+    /* Independent expected hexagon centers catch a silent column relabeling. */
+    static const float center_x[6] ← {180,270.93267f,270.93267f,180,89.06733f,89.06733f};
+    static const float center_y[6] ← {203,255.5f,360.5f,413,360.5f,255.5f};
+    for (unsigned column ← 0; column < 6; ++column) {
+        float north_x,north_y,east_x,east_y,south_x,south_y,west_x,west_y;
+        session_position(&dance,column,&north_x,&north_y); session_position(&dance,column + 6,&east_x,&east_y);
+        session_position(&dance,column + 12,&south_x,&south_y); session_position(&dance,column + 18,&west_x,&west_y);
+        CHECK(north_x == south_x && east_y == west_y);
+        CHECK(fabsf(south_y - north_y - 48) < .0001f && fabsf(east_x - west_x - 48) < .0001f);
+        CHECK(fabsf(north_x - (east_x + west_x) * .5f) < .0001f);
+        CHECK(fabsf(hypotf(north_x - 180,east_y - 308) - 105) < .0001f);
+        CHECK(fabsf(north_x - center_x[column]) < .0001f && fabsf(east_y - center_y[column]) < .0001f);
+    }
+    const char *word ← "abAB"; permutation expected;
+    for (unsigned index ← 0; word[index]; ++index) {
+        uint32_t old_block; CHECK(mathieu_block(&dance.action,dance.selected,&old_block));
+        CHECK(session_move(&dance,word[index]));
+        uint32_t moved; CHECK(mathieu_block(&dance.action,dance.selected,&moved));
+        CHECK(moved == permutation_subset(dance.motion,old_block));
+        while (dance.frame < dance.duration) {
+            for (unsigned dancer ← 0; dancer < 24; ++dancer) {
+                float x,y; CHECK(session_dancer_with_layout(&dance,dancer,&layout,&x,&y));
+                CHECK(x > 23 && x < 337 && y > 151 && y < 465);
+            }
+            session_advance(&dance);
+        }
+        for (unsigned dancer ← 0; dancer < 24; ++dancer) {
+            float x,y,site_x,site_y;
+            session_dancer(&dance,dancer,&x,&y); session_position(&dance,dance.current.image[dancer],&site_x,&site_y);
+            CHECK(x == site_x && y == site_y);
+        }
+    }
+    CHECK(permutation_word(&dance.action,word,&expected)); CHECK(permutation_equal(dance.current,expected));
+    CHECK(dance.selected == permutation_subset(expected,before.selected));
+    /* Validation rejects malformed sampling rather than indexing invalid sites. */
+    before ← dance; float x ← -1,y ← -2;
+    layout.frame ← 91; CHECK(!session_position_with_layout(&dance,0,&layout,&x,&y)); CHECK(x == -1 && y == -2);
+    layout.frame ← 0; layout.from ← 3; CHECK(!session_dancer_with_layout(&dance,0,&layout,&x,&y));
+    layout.from ← MATHIEU_GRID; layout.duration ← 0;
+    CHECK(session_position_with_layout(&dance,0,&layout,&x,&y));
+    float site_x,site_y; session_position(&dance,0,&site_x,&site_y); CHECK(x == site_x && y == site_y);
+    CHECK(!session_position_with_layout(&dance,24,&layout,&x,&y));
+    CHECK(!memcmp(&before,&dance,sizeof dance));
+    CHECK(session_initialize(&restored,12)); CHECK(!session_layout_transition_valid(&restored,&layout));
+    puts("PASS rosette: six exact tetrad diamonds, deterministic 90-frame geometry, immutable group state, abAB octad transport, checkpoints and invalid-input rejection");
+    return 0;
+}
 int main(int argc,char **argv) {
     uint32_t *pixels ← malloc(580u * 1152 * sizeof *pixels); CHECK(pixels);
+    CHECK(!rosette_tests());
     for (unsigned degree ← 12; degree <= 24; degree ← degree + 12) {
         CHECK(!checkpoint_tests(degree));
         CHECK(session_initialize(&session,degree)); permutation identity ← session.current;
         CHECK(!session_tap(&session,-1,0)); CHECK(!session_tap(&session,361,0));
-        for (unsigned layout ← 0; layout < 2; ++layout) {
+        for (unsigned layout ← 0; layout < (degree == 24 ? 3u : 2u); ++layout) {
             CHECK(!suit_marker_tests(degree,layout,pixels));
             session.grid ← layout; session_reset(&session);
             for (unsigned point ← 0; point < 5; ++point) {
@@ -161,7 +250,7 @@ int main(int argc,char **argv) {
             }
             CHECK(session_tap(&session,45,548)); CHECK(session.cursor == 0 && session.selected == 0);
         }
-        printf("PASS M%u touch → exact state → cycle-staged dancer endpoints; distinct suit/form markers transport pixel-for-pixel; selection equivariance, pause, undo/redo/reset and both layouts; 576x1152 raster stride guards\n",degree);
+        printf("PASS M%u touch → exact state → cycle-staged dancer endpoints; distinct suit/form markers transport pixel-for-pixel; selection equivariance, pause, undo/redo/reset and all layouts; 576x1152 raster stride guards\n",degree);
     }
     if (argc == 2) {
         CHECK(session_initialize(&session,24)); session.selected ← 31;

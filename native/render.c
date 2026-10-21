@@ -148,7 +148,7 @@ void mathieu_render_controls(const mathieu_session *session,uint32_t *pixels,uns
     char caption[512]; snprintf(caption,sizeof caption,"M%u  EXACT PERMUTATION DANCE",session->action.degree);
     text(&surface,10,17,1.5f,caption,40,ink_color);
     button(&surface,0,48,"M12",session->action.degree == 12); button(&surface,1,48,"M24",session->action.degree == 24);
-    button(&surface,2,48,session->grid ? "CIRCLE" : "GRID",session->grid); button(&surface,3,48,"LABELS",session->labels);
+    button(&surface,2,48,!session->grid ? "GRID" : session->grid == MATHIEU_GRID && session->action.degree == 24 ? "ROSETTE" : "CIRCLE",session->grid); button(&surface,3,48,"LABELS",session->labels);
     button(&surface,0,100,"A",0); button(&surface,1,100,"A INV",0); button(&surface,2,100,"B",0); button(&surface,3,100,"B INV",0);
     button(&surface,0,474,session->playing == 1 ? "PAUSE" : "PLAY",session->playing == 1);
     button(&surface,1,474,"STEP",0); button(&surface,2,474,"UNDO",0); button(&surface,3,474,"REDO",0);
@@ -166,20 +166,20 @@ void mathieu_render_controls(const mathieu_session *session,uint32_t *pixels,uns
     text(&surface,8,681,1.1f,caption,49,quiet_ink_color);
     if (session->error) text(&surface,8,701,1,session->error == 1 ? "HISTORY FULL - RESET OR UNDO" : session->error == 2 ? "SAVE FAILED - CHECK FREE STORAGE" : "FRAME FAILED - REOPEN APP",40,selected_color);
 }
-static void draw_scene(const mathieu_session *session,canvas surface) {
+static void draw_scene(const mathieu_session *session,canvas surface,const mathieu_layout_transition *layout) {
     uint32_t selected ← session->frame < session->duration ? session->previous_selected : session->selected;
     uint32_t block ← 0; if (subset_size(selected) == 5) mathieu_block(&session->action,selected,&block);
     for (unsigned point ← 0; point < session->action.degree; ++point) {
-        float x,y; session_position(session,point,&x,&y); ring(&surface,x,y,2,.4f,slot_color);
+        float x,y; session_position_with_layout(session,point,layout,&x,&y); ring(&surface,x,y,2,.4f,slot_color);
         if (session->labels) tiny_number(&surface,x - (point < 9 ? .9f : 2.1f),y - 14,point + 1,quiet_ink_color);
     }
     /* Arrows depict only the currently moving cycle, with their exact endpoints. */
     if (session->frame < session->duration) {
         for (unsigned dancer ← 0; dancer < session->action.degree; ++dancer) {
             float x,y,from_x,from_y,to_x,to_y;
-            session_dancer(session,dancer,&x,&y);
-            session_position(session,session->previous.image[dancer],&from_x,&from_y);
-            session_position(session,session->current.image[dancer],&to_x,&to_y);
+            session_dancer_with_layout(session,dancer,layout,&x,&y);
+            session_position_with_layout(session,session->previous.image[dancer],layout,&from_x,&from_y);
+            session_position_with_layout(session,session->current.image[dancer],layout,&to_x,&to_y);
             if (hypotf(x - from_x,y - from_y) < 0.1f || hypotf(x - to_x,y - to_y) < 0.1f) continue;
             line(&surface,from_x,from_y,to_x,to_y,block_color);
             float angle ← atan2f(to_y - from_y,to_x - from_x);
@@ -189,7 +189,7 @@ static void draw_scene(const mathieu_session *session,canvas surface) {
     }
     for (unsigned dancer ← 0; dancer < session->action.degree; ++dancer) {
         unsigned position ← session->frame < session->duration ? session->previous.image[dancer] : session->current.image[dancer];
-        float x,y; session_dancer(session,dancer,&x,&y);
+        float x,y; session_dancer_with_layout(session,dancer,layout,&x,&y);
         if (block & (1u << position)) ring(&surface,x,y,12.5f,.6f,block_color);
         if (selected & (1u << position)) ring(&surface,x,y,10.5f,.7f,selected_color);
         dancer_marker(&surface,x,y,dancer,session->action.degree,session->shapes,session->labels);
@@ -200,22 +200,26 @@ static void clear_scene(canvas surface) {
         surface.pixels[row * surface.stride + column] ← paper_color;
 }
 void mathieu_render_scene(const mathieu_session *session,uint32_t *pixels,unsigned width,unsigned height,unsigned stride) {
-    if (!pixels || !width || !height || stride < width) return;
+    if (!pixels || !width || !height || stride < width || !session_layout_transition_valid(session,NULL)) return;
     canvas surface ← interactive_canvas(pixels,width,height,stride);
-    clear_scene(surface); draw_scene(session,surface);
+    clear_scene(surface); draw_scene(session,surface,NULL);
 }
 void mathieu_render_with_options(const mathieu_session *session,uint32_t *pixels,unsigned width,unsigned height,unsigned stride,mathieu_render_options options) {
-    if (!pixels || !width || !height || stride < width) return;
+    mathieu_render_layout_with_options(session,pixels,width,height,stride,options,NULL);
+}
+void mathieu_render_layout_with_options(const mathieu_session *session,uint32_t *pixels,unsigned width,unsigned height,unsigned stride,mathieu_render_options options,const mathieu_layout_transition *layout) {
+    if (!pixels || !width || !height || stride < width || !session_layout_transition_valid(session,layout)) return;
     if (options.controls_visible) {
-        mathieu_render_scene(session,pixels,width,height,stride);
+        canvas surface ← interactive_canvas(pixels,width,height,stride);
+        clear_scene(surface); draw_scene(session,surface,layout);
         mathieu_render_controls(session,pixels,width,height,stride);
     } else {
-        /* Bounds include both layouts, marker extents, labels and curved swaps.
+        /* Bounds include all layouts, marker extents, labels and curved swaps.
          * Fit the whole scene at source; no framebuffer crop or UI erasure. */
         canvas surface ← {pixels,width,height,stride,fminf(width / 340.0f,height / 340.0f),0,0};
         surface.offset_x ← width * .5f - 180 * surface.scale;
         surface.offset_y ← height * .5f - 308 * surface.scale;
-        clear_scene(surface); draw_scene(session,surface);
+        clear_scene(surface); draw_scene(session,surface,layout);
     }
 }
 void mathieu_render(const mathieu_session *session,uint32_t *pixels,unsigned width,unsigned height,unsigned stride) {

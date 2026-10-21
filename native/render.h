@@ -7,6 +7,10 @@ typedef struct { unsigned controls_visible; } mathieu_render_options;
  * Hidden controls use a scene viewport fitted to the complete dance, not a crop.
  * Labels, selection rings and cycle arrows remain mathematical scene content. */
 void mathieu_render_with_options(const mathieu_session *session, uint32_t *pixels, unsigned width, unsigned height, unsigned stride, mathieu_render_options options);
+/* Sample an owner-controlled layout trajectory through this same scene path.
+ * NULL is equivalent to mathieu_render_with_options. Invalid layouts leave
+ * pixels untouched. The trajectory never enters the mathematical checkpoint. */
+void mathieu_render_layout_with_options(const mathieu_session *session, uint32_t *pixels, unsigned width, unsigned height, unsigned stride, mathieu_render_options options, const mathieu_layout_transition *layout);
 /* Scene clears its target; controls is a separate transparent overlay pass.
  * These two passes share the interactive 360x720 coordinate transform. */
 void mathieu_render_scene(const mathieu_session *session, uint32_t *pixels, unsigned width, unsigned height, unsigned stride);

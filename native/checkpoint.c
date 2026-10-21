@@ -21,7 +21,7 @@ static int valid_state(const mathieu_session *session) {
     unsigned degree ← session->action.degree;
     if ((degree != 12 && degree != 24) || session->length > SESSION_MOVES || session->cursor > session->length ||
         session->moves[session->length] || session->frame > session->duration || session->duration > 24 * 24 ||
-        session->labels > 1 || session->shapes > 1 || session->grid > 1 || session->playing > 2 ||
+        session->labels > 1 || session->shapes > 1 || session->grid > (degree == 24 ? MATHIEU_ROSETTE : MATHIEU_GRID) || session->playing > 2 ||
         (session->speed != 1 && session->speed != 12 && session->speed != 24) || session->error > 3 ||
         session->selected >> degree || session->previous_selected >> degree ||
         subset_size(session->selected) > 5 || subset_size(session->previous_selected) > 5 ||

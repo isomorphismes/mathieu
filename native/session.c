@@ -72,29 +72,65 @@ int session_select(mathieu_session *session, unsigned point) {
     if (!(session->selected & bit) && subset_size(session->selected) == 5) return 0;
     session->selected ← session->selected ^ bit; return 1;
 }
-void session_position(const mathieu_session *session, unsigned point, float *x, float *y) {
-    if (session->grid && session->action.degree == 24) {
+static void site_position(unsigned degree, unsigned layout, unsigned point, float *x, float *y) {
+    if (layout == MATHIEU_ROSETTE && degree == 24) {
+        /* Column c is the unchanged ATLAS set {c,c+6,c+12,c+18}.
+         * Rows become north/east/south/west vertices of diamond c. */
+        static const float horizontal[4] ← {0,24,0,-24};
+        static const float vertical[4] ← {-24,0,24,0};
+        float angle ← -1.57079632679f + 6.28318530718f * (point % 6) / 6;
+        *x ← 180 + 105 * cosf(angle) + horizontal[point / 6];
+        *y ← 308 + 105 * sinf(angle) + vertical[point / 6];
+    } else if (layout == MATHIEU_GRID && degree == 24) {
         *x ← 42 + (point % 6) * 55; *y ← 190 + (point / 6) * 72;
     } else {
-        float angle ← -1.57079632679f + 6.28318530718f * point / session->action.degree;
+        float angle ← -1.57079632679f + 6.28318530718f * point / degree;
         *x ← 180 + 137 * cosf(angle); *y ← 308 + 137 * sinf(angle);
     }
 }
-void session_dancer(const mathieu_session *session, unsigned dancer, float *x, float *y) {
+int session_layout_transition_valid(const mathieu_session *session, const mathieu_layout_transition *layout) {
+    if (!session || (session->action.degree != 12 && session->action.degree != 24)) return 0;
+    unsigned maximum ← session->action.degree == 24 ? MATHIEU_ROSETTE : MATHIEU_GRID;
+    return layout ? layout->from <= maximum && layout->to <= maximum && layout->frame <= layout->duration : session->grid <= maximum;
+}
+int session_position_with_layout(const mathieu_session *session, unsigned point, const mathieu_layout_transition *layout, float *x, float *y) {
+    if (!x || !y || !session_layout_transition_valid(session,layout) || point >= session->action.degree) return 0;
+    if (!layout) { site_position(session->action.degree,session->grid,point,x,y); return 1; }
+    if (!layout->duration || layout->frame == layout->duration) {
+        site_position(session->action.degree,layout->to,point,x,y); return 1;
+    }
+    site_position(session->action.degree,layout->from,point,x,y);
+    if (!layout->frame || layout->from == layout->to) return 1;
+    float to_x,to_y; site_position(session->action.degree,layout->to,point,&to_x,&to_y);
+    float fraction ← (float)layout->frame / layout->duration;
+    fraction ← fraction * fraction * (3 - 2 * fraction);
+    *x ← *x + (to_x - *x) * fraction; *y ← *y + (to_y - *y) * fraction;
+    return 1;
+}
+void session_position(const mathieu_session *session, unsigned point, float *x, float *y) {
+    session_position_with_layout(session,point,NULL,x,y);
+}
+int session_dancer_with_layout(const mathieu_session *session, unsigned dancer, const mathieu_layout_transition *layout, float *x, float *y) {
+    if (!x || !y || !session_layout_transition_valid(session,layout) || dancer >= session->action.degree) return 0;
     unsigned from ← session->previous.image[dancer], to ← session->current.image[dancer];
-    if (session->frame >= session->duration || from == to) { session_position(session, to, x, y); return; }
+    if (session->frame >= session->duration || from == to) return session_position_with_layout(session,to,layout,x,y);
     unsigned total; unsigned cycle ← cycle_number(session->motion, from, &total);
     unsigned active ← session->frame / session->speed;
-    if (cycle < active) { session_position(session, to, x, y); return; }
-    if (cycle > active) { session_position(session, from, x, y); return; }
+    if (cycle < active) return session_position_with_layout(session,to,layout,x,y);
+    if (cycle > active) return session_position_with_layout(session,from,layout,x,y);
     float fraction ← (float)(session->frame % session->speed) / session->speed;
     fraction ← fraction * fraction * (3 - 2 * fraction);
-    float from_x, from_y, to_x, to_y; session_position(session, from, &from_x, &from_y); session_position(session, to, &to_x, &to_y);
+    float from_x, from_y, to_x, to_y;
+    session_position_with_layout(session,from,layout,&from_x,&from_y); session_position_with_layout(session,to,layout,&to_x,&to_y);
     /* An oriented bend separates the two directed paths of a transposition.
      * Cycles move in disjoint time intervals; endpoints remain exact. */
     float bend ← 0.24f * sinf(3.14159265359f * fraction);
     *x ← from_x + (to_x - from_x) * fraction - (to_y - from_y) * bend;
     *y ← from_y + (to_y - from_y) * fraction + (to_x - from_x) * bend;
+    return 1;
+}
+void session_dancer(const mathieu_session *session, unsigned dancer, float *x, float *y) {
+    session_dancer_with_layout(session,dancer,NULL,x,y);
 }
 int session_tap(mathieu_session *session, float x, float y) {
     if (x < 0 || x >= 360 || y < 0 || y >= 720) return 0;
@@ -105,7 +141,7 @@ int session_tap(mathieu_session *session, float x, float y) {
             int success ← session_initialize(session, column ? 24 : 12);
             session->logical_tick ← tick; return success;
         }
-        if (column == 2) { session->grid ← !session->grid; return 1; }
+        if (column == 2) { session->grid ← session->action.degree == 24 ? (session->grid + 1) % 3 : !session->grid; return 1; }
         session->labels ← !session->labels; return 1;
     }
     if (y >= 100 && y < 144) {

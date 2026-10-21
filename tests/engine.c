@@ -86,6 +86,20 @@ int main(int argc, char **argv) {
         qsort(action.blocks, action.block_count, sizeof *action.blocks, compare_words);
         if (reference) for (unsigned block ← 0; block < action.block_count; ++block) printf("block %u\n", action.blocks[block]);
         if (degree == 24) {
+            /* The existing row-major grid is a Golay sextet in these ATLAS
+             * coordinates, not an unproved claim about Curtis's MOG. */
+            unsigned pairs ← 0;
+            for (unsigned first ← 0; first < 6; ++first)
+            for (unsigned second ← first + 1; second < 6; ++second) {
+                uint32_t octad ← 0;
+                for (unsigned row ← 0; row < 4; ++row)
+                    octad ← octad | (1u << (6 * row + first)) | (1u << (6 * row + second));
+                CHECK(subset_size(octad) == 8);
+                CHECK(bsearch(&octad,action.blocks,action.block_count,sizeof *action.blocks,compare_words));
+                ++pairs;
+            }
+            CHECK(pairs == 15);
+            if (!reference) puts("PASS Golay sextet: 15/15 unions of two grid columns are native octads");
             CHECK(mathieu_golay(&action, codewords)); qsort(codewords, 4096, sizeof *codewords, compare_words);
             unsigned distribution[25] ← {0};
             for (unsigned word ← 0; word < 4096; ++word) {

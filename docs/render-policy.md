@@ -16,4 +16,7 @@ Movie callers select controls off and drive the session with a separately
 authored timed motion plan. No screenshot cropping, masking or UI erasure is
 involved. The host test checks both degrees/layouts, scene motion, control-only
 error changes, pass composition, session immutability and stride boundaries.
+The M₂₄ rosette and sampled layout transitions use the same scene path; see
+[`rosette-layout.md`](rosette-layout.md). `render-policy-test OUTPUT.ppm` also
+writes the real controls-free 1280×720 rosette for visual inspection.
 These are host renderer checks, not physical-device acceptance or a new APK.
