@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Verify a Mathieu replay's frames and export a fixed-rate H.264 MP4.
+"""Verify a Mathieu replay and use the canonical Kitchen movie assembler.
 
-The interactive renderer must first save a session and render frames offline.
-This tool does not screen-record, invent motion, or certify Mathieu membership.
+The interactive renderer first saves a session and renders frames offline.
+Only isomorphisms/kitchen owns the FFmpeg encoding command.
+This module does not screen-record, invent motion, or certify Mathieu membership.
 """
 import argparse
 import hashlib
@@ -170,20 +171,27 @@ def export(session_path, frames_dir, output):
     verify_frames(frames_dir, width, height, hashes)
     if output.suffix.lower() != ".mp4":
         raise CaptureError("output must end in .mp4")
+
+    # The movie assembly contract belongs to isomorphisms/kitchen.
+    # This Mathieu wrapper validates mathematical state and inputs, then
+    # invokes the pinned canonical builder without duplicating FFmpeg flags.
+    kitchen_root = os.environ.get("KITCHEN_ROOT")
+    if not kitchen_root:
+        raise CaptureError("KITCHEN_ROOT must point to a pinned isomorphisms/kitchen checkout")
+    kitchen_builder = Path(kitchen_root) / "tasks" / "movie-from-stills" / "build.sh"
+    if not kitchen_builder.is_file():
+        raise CaptureError(f"canonical Kitchen movie builder missing: {kitchen_builder}")
+
     output.parent.mkdir(parents=True, exist_ok=True)
-    # Only replace the public result after the encoder and independent probe pass.
+    # Keep old public output intact on encoder or verification failure.
     with tempfile.NamedTemporaryFile(
         prefix=".mathieu-export-", suffix=".mp4", dir=output.parent, delete=False
     ) as stream:
         pending = Path(stream.name)
     try:
         command([
-            "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-            "-framerate", str(fps), "-start_number", "0",
-            "-i", str(frames_dir / "frame_%06d.png"),
-            "-frames:v", str(len(hashes)), "-an",
-            "-c:v", "libx264", "-preset", "slow", "-crf", "17",
-            "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(pending)
+            "sh", str(kitchen_builder), str(frames_dir / "frame_%06d.png"),
+            str(fps), str(pending),
         ])
         verify_video(pending, width, height, fps, len(hashes))
         os.replace(pending, output)
