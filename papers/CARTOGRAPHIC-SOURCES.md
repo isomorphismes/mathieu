@@ -9,7 +9,7 @@ These are external full texts and original reading notes. No later PDF, book sca
 Alexander Zvonkin, *How to draw a group?*, **Discrete Mathematics 180** (1998), 403–413, [DOI 10.1016/S0012-365X(97)00128-3](https://doi.org/10.1016/S0012-365X(97)00128-3).
 
 - [Author-hosted version](https://www.labri.fr/perso/zvonkin/Research/drawgroup.pdf), 13 pages.
-- [FPSAC 1995 proceedings version](https://fpsac-archive.github.io/FPSAC95/ARTICLES/61.ZVONKIN.pdf), 11 scanned pages, printed pp. 601–611. This earlier version supplied the legible text used here; page numbers and versions must remain distinct.
+- [FPSAC 1995 proceedings version](https://fpsac-archive.github.io/FPSAC95/ARTICLES/61.ZVONKIN.pdf), 11 scanned pages, printed pp. 601–611. Complete PDF retrieved and inspected on 21 October 2026: 6,637,763 bytes; SHA-256 `9667976e0e0999eb0f51aef9f4e75d31972964e8010561e53d5aa3bb2c8a59ec`. This earlier version supplied the legible text used here; page numbers and versions must remain distinct.
 - Read Example 1.2 / Figure 2, then Example 2.5 and §3. The example is credited to **Günter Malle's April 1993 Luminy conference talk**, not to an identified standalone 1993 paper.
 
 Twelve labels mark the ends of six edges. One operation crosses each edge; the other rotates the ends meeting at a vertex. In this paper's labeling:
@@ -40,9 +40,13 @@ Its opening “mouse” map is a **different** M₁₂ generating example. Examp
 
 The refined passport is [6B, 2A, 8B]. The paper also supplies planar M₁₂ maps and M₂₄ examples. Its M₂₄ catalogue is explicitly incomplete at **130 or 131** essentially different maps; do not report 130 as a proved exhaustive count.
 
-## 3. NeverEndingBooks: access remains unresolved
+## 3. NeverEndingBooks: recovered from the author's archive
 
-Lieven Le Bruyn, [*Monsieur Mathieu*](https://www.neverendingbooks.org/monsieur-mathieu). This is the blog reference in the user's post. Retrieval on 21 October 2026 returned gateway/time-out errors. **The article itself was not read.** Its attribution and connection to Malle's dessin are independently corroborated by the following paper, not reconstructed from the unavailable blog.
+Lieven Le Bruyn, [*Monsieur Mathieu*](https://www.neverendingbooks.org/monsieur-mathieu), **1 March 2007**. The original domain failed, but the complete article was retrieved and read on 21 October 2026 from [the author's own GitHub archive](https://github.com/lievenlebruyn/neverendingbooks/blob/9143c7f2b5f65e1372a3bdafcf052d959e563049/monsieur-mathieu/index.html). Its source blob is `3e8dc00ce35237cd33d082615f591418510ef263`.
+
+This is the numbered drawing in the user's post. The blog explicitly gives edge crossing s = (1 2)(3 4)(5 8)(7 6)(9 12)(11 10) and vertex rotation t = (1 2 3)(4 5 6)(8 9 10), attributing the construction to Malle. It also links Zvonkin's paper, illustrates M₂₄ and relates the dessin to a degree-12 rational Belyi map over ℚ(√−11).
+
+**Formula caution:** the printed conjugate value of a drops the original factor 7 multiplying √−11. The displayed negative-square identity for f(z) − 1 also conflicts with the leading coefficients of the two monic numerator polynomials. These are source inconsistencies, not independently qualified algebraic fixtures; use the later primary paper for verified formulas. The blog's assertions about character fields and nonconjugate embeddings have not been accepted here.
 
 ## 4. Exact Belyi functions behind the pictures
 
