@@ -6,6 +6,32 @@
 #define CHECK(condition) do { if (!(condition)) { fprintf(stderr,"FAIL session line %d: %s\n",__LINE__,#condition); return 1; } } while (0)
 static mathieu_session session;
 static void finish_move(void) { session.playing ← 0; while (session.frame < session.duration) session_advance(&session); }
+enum { MARKER_PATCH ← 31 };
+static void copy_marker_patch(uint32_t *destination,const uint32_t *pixels,const mathieu_session *dance,unsigned point) {
+    float x,y; session_position(dance,point,&x,&y);
+    unsigned left ← (unsigned)(x * 1.6f) - MARKER_PATCH / 2, top ← (unsigned)(y * 1.6f) - MARKER_PATCH / 2;
+    for (unsigned row ← 0; row < MARKER_PATCH; ++row)
+        memcpy(destination + row * MARKER_PATCH,pixels + (top + row) * 580 + left,MARKER_PATCH * sizeof *pixels);
+}
+static int suit_marker_tests(unsigned degree,unsigned layout,uint32_t *pixels) {
+    mathieu_session dance; CHECK(session_initialize(&dance,degree));
+    dance.labels ← 0; dance.shapes ← 1; dance.grid ← layout;
+    uint32_t original[24][MARKER_PATCH * MARKER_PATCH],moved[MARKER_PATCH * MARKER_PATCH];
+    mathieu_render(&dance,pixels,576,1152,580);
+    for (unsigned dancer ← 0; dancer < degree; ++dancer) {
+        copy_marker_patch(original[dancer],pixels,&dance,dancer);
+        for (unsigned earlier ← 0; earlier < dancer; ++earlier)
+            CHECK(memcmp(original[earlier],original[dancer],sizeof moved));
+    }
+    CHECK(session_move(&dance,'b'));
+    while (dance.frame < dance.duration) session_advance(&dance);
+    mathieu_render(&dance,pixels,576,1152,580);
+    for (unsigned dancer ← 0; dancer < degree; ++dancer) {
+        copy_marker_patch(moved,pixels,&dance,dance.action.generator[1].image[dancer]);
+        CHECK(!memcmp(moved,original[dancer],sizeof moved));
+    }
+    return 0;
+}
 static int same_checkpoint(const mathieu_session *first,const mathieu_session *second) {
     uint8_t left[SESSION_CHECKPOINT_MAX],right[SESSION_CHECKPOINT_MAX];
     size_t length ← session_checkpoint(first,left,sizeof left);
@@ -88,6 +114,7 @@ int main(int argc,char **argv) {
         CHECK(session_initialize(&session,degree)); permutation identity ← session.current;
         CHECK(!session_tap(&session,-1,0)); CHECK(!session_tap(&session,361,0));
         for (unsigned layout ← 0; layout < 2; ++layout) {
+            CHECK(!suit_marker_tests(degree,layout,pixels));
             session.grid ← layout; session_reset(&session);
             for (unsigned point ← 0; point < 5; ++point) {
                 float x,y; session_position(&session,point,&x,&y); CHECK(session_tap(&session,x,y));
@@ -119,7 +146,7 @@ int main(int argc,char **argv) {
             for (unsigned dancer ← 0; dancer < degree; ++dancer) {
                 float x,y; session_dancer(&session,dancer,&x,&y);
                 unsigned center_x ← x * 1.6f,center_y ← y * 1.6f;
-                CHECK(pixels[center_y * 580 + center_x] != 0xff181410);
+                CHECK(pixels[center_y * 580 + center_x] != pixels[0]);
             }
             uint32_t original_colors[24];
             for (unsigned dancer ← 0; dancer < degree; ++dancer) {
@@ -134,7 +161,7 @@ int main(int argc,char **argv) {
             }
             CHECK(session_tap(&session,45,548)); CHECK(session.cursor == 0 && session.selected == 0);
         }
-        printf("PASS M%u touch → exact state → cycle-staged dancer endpoints; selection equivariance, pause, undo/redo/reset and both layouts; 576x1152 raster stride guards\n",degree);
+        printf("PASS M%u touch → exact state → cycle-staged dancer endpoints; distinct suit/form markers transport pixel-for-pixel; selection equivariance, pause, undo/redo/reset and both layouts; 576x1152 raster stride guards\n",degree);
     }
     if (argc == 2) {
         CHECK(session_initialize(&session,24)); session.selected ← 31;
