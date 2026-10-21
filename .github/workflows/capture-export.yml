@@ -1,0 +1,30 @@
+name: Capture export verification
+
+on:
+  push:
+    paths:
+      - 'capture/**'
+      - '.github/workflows/capture-export.yml'
+  pull_request:
+    paths:
+      - 'capture/**'
+      - '.github/workflows/capture-export.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install video encoder and verifier
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -hide_banner -encoders | grep -E 'libx264'
+          ffprobe -version
+      - name: Verify checksums, permutations and MP4 frame output
+        run: python3 -m unittest discover -s capture/tests -v
