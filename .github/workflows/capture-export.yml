@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - 'capture/**'
+      - 'AGENTS.md'
       - '.github/workflows/capture-export.yml'
   pull_request:
     paths:
       - 'capture/**'
+      - 'AGENTS.md'
       - '.github/workflows/capture-export.yml'
   workflow_dispatch:
 
