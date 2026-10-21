@@ -1,0 +1,9 @@
+package	org.isomorphisms.mathieu
+lane	public-development
+keystore	mathieu-development.p12
+keystore_type	PKCS12
+key_alias	mathieu-development
+store_password	android
+key_password	android
+certificate_sha256	f997a30170a967e073ab47e1212a71b3967ffe2e1e88d78d659c77bf085cb3fe
+keystore_sha256	00ecef16e04031009904028d6c1e411110bfcc2fb8486223a7835259567a3df7
