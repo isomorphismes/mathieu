@@ -17,10 +17,11 @@ FLAGS_armeabi-v7a = -marm -march=armv7-a -mfpu=vfpv3-d16 -mfloat-abi=softfp
 FLAGS_arm64-v8a = -ffixed-x18
 FLAGS_x86_64 = -march=x86-64-v2 -mno-avx -mno-movbe
 NDK_CC = $(NDK_BIN)/$(TARGET_$(ABI))26-clang
-BUILTIN = $(shell "$(ICK_ANDROID)" -print-file-name=include)
+ICK_PREFIX = -B$(dir $(ICK_ANDROID))
+BUILTIN = $(shell "$(ICK_ANDROID)" $(ICK_PREFIX) -print-file-name=include)
 OPT_Debug = -O0 -g -gdwarf-4 -gno-variable-location-views
 OPT_Release = -O2 -DNDEBUG
-APP_FLAGS = $(FLAGS_$(ABI)) --sysroot=$(SYSROOT) -nostdinc -isystem $(BUILTIN) -isystem $(SYSROOT)/usr/include -isystem $(SYSROOT)/usr/include/$(HEADER_$(ABI)) -I$(NDK)/sources/android/native_app_glue -D__ANDROID__ -D__ANDROID_API__=26 -D__ANDROID_MIN_SDK_VERSION__=26 -DBIONIC_IOCTL_NO_SIGNEDNESS_OVERLOAD -std=c11 -fPIC -Wall -Wextra -Werror $(OPT_$(PROFILE))
+APP_FLAGS = $(ICK_PREFIX) $(FLAGS_$(ABI)) --sysroot=$(SYSROOT) -nostdinc -isystem $(BUILTIN) -isystem $(SYSROOT)/usr/include -isystem $(SYSROOT)/usr/include/$(HEADER_$(ABI)) -I$(NDK)/sources/android/native_app_glue -D__ANDROID__ -D__ANDROID_API__=26 -D__ANDROID_MIN_SDK_VERSION__=26 -DBIONIC_IOCTL_NO_SIGNEDNESS_OVERLOAD -std=c11 -fPIC -Wall -Wextra -Werror $(OPT_$(PROFILE))
 OBJECTS = $(OUT)/native/mathieu.o $(OUT)/native/session.o $(OUT)/native/render.o $(OUT)/android/activity.o $(OUT)/glue.o
 .SECONDARY:
 .PHONY: library FORCE
