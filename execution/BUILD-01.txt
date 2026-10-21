@@ -1,0 +1,8 @@
+SUN MATHIEU-BUILD-01
+Human authorization: 2026-10-21. Owner: isomorphisms/mathieu.
+Authoritative envelope: https://github.com/isomorphisms/flexible-pipes/issues/244
+Execution: Flexible Pipes → maintained Kitchen/pinned Ike → independent AI-CI → Cat Food.
+
+Build an offline native Android application enacting exact M12/M24 permutations, with simple distinguishable dancers, cycle/word controls, five-point completion in the Witt designs, correct Golay invariants, stable signing, separate A1 ARM32 and C67 ARM64 APKs, and distinct mathematical, rendering, emulator, physical-device and delivery evidence. No group enumeration for M24 and no substitute root animation. Reuse the two existing paper/capture branches without claiming their acceptance.
+
+This file records the implementation envelope. Source presence, producer tests, and pipeline dispatch do not imply independent acceptance or completion. Capture must also satisfy FP #243 with a real recorded interaction and a verified video.

@@ -1,0 +1,20 @@
+ICK ?= ick
+GREASE ?= grease
+PROFILE ?= Debug
+OUT ?= build/$(PROFILE)
+OPT_Debug = -O0 -g
+OPT_Release = -O2 -DNDEBUG
+CFLAGS = -fno-link-libatomic -std=c11 -Wall -Wextra -Werror $(OPT_$(PROFILE))
+
+.PHONY: host-test reference
+host-test: $(OUT)/engine-test $(OUT)/session-test
+	$(OUT)/engine-test
+	$(OUT)/session-test
+reference: $(OUT)/engine-test
+	$(OUT)/engine-test --reference
+$(OUT)/engine-test: native/mathieu.c native/mathieu.h tests/engine.c
+	mkdir -p $(OUT)
+	$(ICK) $(CFLAGS) native/mathieu.c tests/engine.c -o $@
+$(OUT)/session-test: native/mathieu.c native/mathieu.h native/session.c native/session.h native/render.c native/render.h tests/session.c
+	mkdir -p $(OUT)
+	$(ICK) $(CFLAGS) native/mathieu.c native/session.c native/render.c tests/session.c -lm -o $@
