@@ -5,18 +5,20 @@ Original sources for the multiply transitive permutation groups discovered by É
 ## Original papers (scanned primary sources)
 
 1. **1861** — Émile Mathieu, *Mémoire sur l'étude des fonctions de plusieurs quantités, sur la manière de les former et sur les substitutions qui les laissent invariables*, *Journal de Mathématiques Pures et Appliquées*, 2e série, **6**, 241–323.
-   - [Original paper, complete scanned PDF (Numdam)](https://www.numdam.org/item/JMPA_1861_2_6__241_0.pdf)
+   - [Original paper, PDF preserved in this repository](papers/Mathieu-1861-Memoire.pdf)
+   - [Numdam source scan](https://www.numdam.org/item/JMPA_1861_2_6__241_0.pdf)
    - [Bibliographic record](https://www.numdam.org/item/JMPA_1861_2_6__241_0/)
    - Develops the multiply transitive construction, including the fivefold transitive action on 12 points; announces the 24-point case.
 
 2. **1873** — Émile Mathieu, *Sur la fonction cinq fois transitive de 24 quantités*, *Journal de Mathématiques Pures et Appliquées*, 2e série, **18**, 25–46.
-   - [Original paper, complete scanned PDF (Numdam)](https://www.numdam.org/item/JMPA_1873_2_18__25_0.pdf)
+   - [Original paper, PDF preserved in this repository](papers/Mathieu-1873-Fonction-cinq-fois-transitive-24.pdf)
+   - [Numdam source scan](https://www.numdam.org/item/JMPA_1873_2_18__25_0.pdf)
    - [Bibliographic record](https://www.numdam.org/item/JMPA_1873_2_18__25_0/)
    - Supplies the explicit 24-point construction, now associated with M₂₄.
 
 These are Mathieu's writings, not modern retellings. Both are in French. The digitizations are provided by Numdam / Mathdoc and the Bibliothèque nationale de France's Gallica program; preserve that provenance.
 
-The `papers/` directory is intended to hold unchanged copies of the two scans, imported directly from the URLs above. Do not replace the originals with generated transcriptions or paraphrases.
+The [`papers/`](papers/) directory holds copies of both complete scans, imported directly from the sources above. [`papers/SHA256SUMS`](papers/SHA256SUMS) records their SHA-256 hashes. Do not replace the originals with generated transcriptions or paraphrases.
 
 ## Permutations as movement
 
