@@ -1,0 +1,14 @@
+SUN MATHIEU-UP-01 — Exact Book Permutations and Signed M12 Choreography
+Human assignment: October 21, 2026. Owner: isomorphismes/mathieu.
+Parent: https://github.com/isomorphisms/flexible-pipes/issues/244
+Implementation: existing Mathieu PR #3, Implement exact Mathieu choreography and native Android application core.
+Execution: Flexible Pipes → maintained Kitchen/pinned Ike → independent AI-CI → Cat Food.
+
+Required outcome: exact UP0–UP20 from Griess §5.38 and signed monomial operators §7.28.1–3, with original labels, cycles, orders, source references, verified standard-sextet/ATLAS conversion, Golay/Witt preservation and applicable subgroup claims. Signed lifts must retain every negative sign, negative fixed point, composition and inverse; independently verify Proposition 7.29 and central signs. Never substitute arbitrary same-order permutations or discard signs.
+
+Extend the current application: select/apply/invert/compose/step/undo/replay/inspect all 24 operations. Support standard sextet, left dodecad and existing arrangements, retained palette/markers/tiny optional digits, visible unobtrusive signs and actual computed motion. Controls remain independently suppressible. Reuse the shared planned-movie system and Kitchen as sole encoder.
+
+Independent exact-head verification must reject wrong labels/arrows/signs/conversions and false animation, and cover group membership, code/design preservation, deterministic composition/inverse/replay and controls-free actual-state frames. Deliver separate A1 ARM32 and C67 ARM64 APKs with existing identity/stable signer. Physical behavior and replacement-update testing remain separate. Preserve all successful tests and do not merge or claim completion without required receipts. Do not commit book photographs or claim transcription of illegible sources.
+
+Current disposition: AUTHORING_ONLY, PARTIAL_SOURCE_IMPLEMENTATION, BLOCKED_EXACT_SOURCE, NOT_DISPATCHED, NOT_AICI_ACCEPTED, NOT_MERGED.
+Implemented authoring scope: generic signed-operator algebra and supplied-coordinate Golay comparison only. See docs/book-operations.md and data/griess/operations.tsv. No named book operation has been admitted; no new APK/movie is produced by this slice.
