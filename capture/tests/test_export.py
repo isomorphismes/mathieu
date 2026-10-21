@@ -1,9 +1,11 @@
-"""Contract and end-to-end tests for the host-side Mathieu video exporter.
+"""Contract tests for Mathieu input validation with Kitchen-owned movie export.
 
 Fixture uses the identity action: this does NOT qualify Mathieu generators.
 """
 import hashlib
 import json
+import os
+from unittest import mock
 from pathlib import Path
 import shutil
 import struct
@@ -105,7 +107,15 @@ class MathieuExportTests(unittest.TestCase):
         with self.assertRaisesRegex(CaptureError, "wrong PNG size"):
             export(self.session, self.frames, self.root / "out.mp4")
 
-    @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "needs ffmpeg and ffprobe")
+    def test_missing_kitchen_builder_rejected(self):
+        with mock.patch.dict(os.environ, {"KITCHEN_ROOT": ""}):
+            with self.assertRaisesRegex(CaptureError, "KITCHEN_ROOT"):
+                export(self.session, self.frames, self.root / "out.mp4")
+
+    @unittest.skipUnless(
+        shutil.which("ffmpeg") and shutil.which("ffprobe") and os.environ.get("KITCHEN_ROOT"),
+        "needs ffmpeg, ffprobe and pinned KITCHEN_ROOT",
+    )
     def test_mp4_has_all_frames_and_distinct_ends(self):
         video = self.root / "out.mp4"
         self.assertEqual(export(self.session, self.frames, video), video)
