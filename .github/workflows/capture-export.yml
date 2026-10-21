@@ -18,13 +18,32 @@ jobs:
   validate-export:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      KITCHEN_ROOT: ${{ github.workspace }}/.kitchen
     steps:
-      - uses: actions/checkout@v4
-      - name: Install video encoder and verifier
+      - name: Check out Mathieu exact head
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+      - name: Check out canonical Kitchen movie builder at pinned commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          repository: isomorphisms/kitchen
+          ref: 739faa3068983531a04db33b3ecc43573272368e
+          path: .kitchen
+          sparse-checkout: |
+            tasks/movie-from-stills
+          persist-credentials: false
+      - name: Verify shared Kitchen ownership
+        run: |
+          test "$(git -C .kitchen rev-parse HEAD)" = 739faa3068983531a04db33b3ecc43573272368e
+          test -f .kitchen/tasks/movie-from-stills/build.sh
+          test -f .kitchen/tasks/movie-from-stills/1.sh
+      - name: Install FFmpeg and verifier
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
           ffmpeg -hide_banner -encoders | grep -E 'libx264'
           ffprobe -version
-      - name: Verify checksums, permutations and MP4 frame output
+      - name: Verify exact Mathieu input and shared Kitchen MP4 output
         run: python3 -m unittest discover -s capture/tests -v
