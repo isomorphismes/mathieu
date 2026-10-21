@@ -1,87 +1,91 @@
-# Mathieu capture: session-to-video export
+# Mathieu capture: reuse the shared Kitchen movie pipeline
 
-This is the **host-side export slice**, not a completed Mathieu interaction
-or screen recorder. The repository's existing app/renderer is not yet built.
-A future renderer must record the *real* session and produce the corresponding
-numbered lossless PNG frames by replaying its own saved input events.
+**Mathematical ownership:** Mathieu records the user's exact interaction and
+replays its mathematical state into numbered lossless PNG/PPM frames.
 
-Follow [MATHIEU-CAPTURE-01](https://github.com/isomorphisms/flexible-pipes/issues/243).
-Do not count this encoder or its synthetic test as end-to-end acceptance.
+**Movie ownership:** `isomorphisms/kitchen/tasks/movie-from-stills/build.sh`
+converts the numbered stills into H.264/yuv420p MP4 using FFmpeg. Do not
+introduce a second encoder, local FFmpeg command, or raw-RGB movie protocol
+in Mathieu. See [Kitchen's canonical contract](https://github.com/isomorphisms/kitchen/blob/main/tasks/movie-from-stills/README.md)
+and [Pauli's existing usage](https://github.com/isomorphismes/pauli/blob/main/AGENTS.md).
 
-## Contract: mathieu.capture.v1
+**Acceptance:** AI-CI must independently inspect the real saved mathematical
+session, exact permutation state, output frames, audio policy (if any) and MP4.
+The repository currently has no Mathieu interaction renderer. This PR
+implements *only the input verification + Kitchen invocation foundation*.
 
-The session is a UTF-8 JSON document containing:
+## `mathieu.capture.v1` session
+
+Store a UTF-8 JSON manifest plus lossless numbered stills, starting at frame 0.
 
 | Field | Meaning |
 | --- | --- |
-| format | Exactly mathieu.capture.v1 |
-| source_revision | Exact 40-character lowercase Git commit SHA of the renderer |
-| width, height | Output pixel dimensions, **even** for H.264/yuv420p; default target 1920×1080 |
-| fps | 24, 30, or **60** frames per second |
-| frame_sha256 | SHA-256 hex strings for each lossless PNG, beginning with frame zero |
-| events | Nonempty, ordered original interaction events with 0-based frame index and kind |
-| math.group | M11, M12, M22, M23, or M24 |
-| math.generators | Dictionary of names to exact 0-based one-line permutation arrays |
-| math.word | Generator names in chronological action order |
-| math.final_mapping | Composite permutation, with generator words applied left to right |
+| `format` | `mathieu.capture.v1` |
+| `source_revision` | 40-character lowercase source commit SHA |
+| `width`, `height`, `fps` | Frame size and 24/30/60fps playback clock |
+| `frame_sha256` | One checksum per numbered PNG |
+| `events` | Ordered input records with frame number and event kind |
+| `math.group` | `M11`, `M12`, `M22`, `M23`, or `M24` |
+| `math.generators` | Named exact 0-based permutation arrays |
+| `math.word` | Generator actions in chronological order |
+| `math.final_mapping` | Independently checked composite permutation |
 
-The extra event fields preserve continuous input coordinates, source times
-(e.g. monotonic nanoseconds), UI settings, viewport, label/shape/color choices,
-camera positions, initial state, and identities of selected generators.
-The future recorder/replay implementation must not discard those fields. The
-encoder checks the recorded *frame indices* and mathematical word but does
-not need to interpret the full input payload.
+The eventual recorder must also preserve continuous pointer input
+and timestamps, checkpoints, initial state, selected labels/colors/shapes,
+camera/viewport state, and enough renderer/compiler identities to reproduce
+the exact interaction. The current validator checks a subset of those fields,
+not the full interactive recording contract. A name such as `M24` in a
+manifest does **not** prove that the listed generators belong to that group;
+independent reference fixtures and order/transitivity checks remain necessary.
 
-A future event recorder must persist the source events **as they occur**,
-journal/checkpoint progress and expose Finish → Preview → Export Video. Replay
-at fixed logical frame times: render every frame without throwing away frames
-when the hardware is slow. Avoid encoding live EGL screen grabs at variable
-fps or taking screenshots of an Android UI. Use an offscreen framebuffer at
-the requested output dimensions, with explicit initial/final holds. Keep
-original PNGs and the session log as editable source assets.
+## Host usage (only after a genuine replay renderer exists)
 
-**Mathematical qualification is separate:** this exporter checks that the
-named permutations are bijections and that the stated final permutation
-equals their composite. It **cannot** establish that those permutations
-generate the genuine Mathieu group. The renderer must use independently
-verified exact Mathieu generator fixtures, not generic polynomial braids.
+1. Replay the saved interaction at fixed logical frame times, producing
+   `frames/frame_000000.png`, `frames/frame_000001.png`, etc.
+   Do not skip logical frames because rendering is slow. Retain the original
+   frame sequence and session as editable/provenance assets.
+2. Use an **explicit pinned checkout** of `isomorphisms/kitchen`.
+   The CI fixture checks out commit
+   `739faa3068983531a04db33b3ecc43573272368e`.
+3. Invoke the Mathieu-specific consistency checks and the shared encoder:
 
-## Host export
+       KITCHEN_ROOT=/path/to/verified/kitchen \
+         python3 -m capture.export session.json frames mathieu.mp4
 
-Requires Python 3.9+, FFmpeg including libx264 and ffprobe.
+The wrapper checks event ordering, permutation bijections/composition, frame
+numbering/sizes/checksums, then calls Kitchen's **unchanged** `build.sh`
+with the still-image pattern, FPS, and a private temporary output. It uses
+ffprobe to check decoded frame count, codec, FPS, dimensions and duration,
+then atomically publishes the MP4. It never constructs its own FFmpeg command.
 
-Produce consecutive files 'frame_000000.png', 'frame_000001.png', and so on,
-all with the dimensions in the session. The PNG SHA-256 hashes must match.
-Then, from the repository root:
+Kitchen's ordinary preset is H.264, yuv420p, CRF 18, faststart. Keep
+1080p/60fps as the quality target where the frame renderer supports it;
+4K or device-local encoding requires actual performance and correctness
+qualification. No claim of A1/C67 video export is made.
 
-    python3 -m capture.export ./session.json ./frames ./mathieu.mp4
+## Tests
 
-The exporter verifies frame numbering, hashes, image sizes, event ordering,
-permutation composition, and output metadata with ffprobe. It checks the
-decoded H.264 frame count, fps, dimensions, and duration before atomically
-publishing the MP4. Missing/damaged frames and encoding failures leave no
-new public MP4. Output uses H.264, yuv420p, CRF 17 and faststart for ordinary
-sharing. Lossless source is the **original PNG sequence**, not the MP4.
+With FFmpeg/ffprobe and a pinned Kitchen checkout:
 
-Tests, including an actual tiny MP4 export and first/last frame comparison:
+    KITCHEN_ROOT=/path/to/verified/kitchen \
+      python3 -m unittest discover -s capture/tests -v
 
-    python3 -m unittest discover -s capture/tests -v
+The fixture includes a **synthetic** four-frame PNG sequence and the
+identity permutation, so passing it verifies the media integration and
+failure behavior **but not** the real Mathieu interaction. Physical-device
+runtime capture is a separate evidence source: an offline replayed movie
+must never be labeled proof that the Android app displayed those frames.
 
-The generated test pattern is deliberately *not* a Mathieu animation.
+## Remaining work
 
-## Still required for usable capture
+- Actual interactive mathematics, validated Mathieu generators, and a
+  durable user-event log with interruption recovery.
+- Deterministic replay into the native renderer / offscreen framebuffer,
+  retaining actual interaction timing, labels, choices and camera movement.
+- Finish → Preview → Export UI and separate optional raw-runtime capture.
+- Real end-to-end video + mathematical AI-CI acceptance, with device proof
+  where applicable. See
+  [MATHIEU-CAPTURE-01](https://github.com/isomorphisms/flexible-pipes/issues/243).
 
-- Android/native (or eventual alternate UI) event journal, deterministic
-  replay, exact generator data and calibrated mathematical-state checks.
-- Offscreen renderer that recreates actual touch paths and strokes from the
-  saved session, including real labels/colors/shapes and camera movement.
-- Finish/preview/export interface and safe storage/share behavior on devices.
-  C67/A1 export must be device-tested; offline/host encoding is the fallback.
-- Acceptance fixtures: real interaction → log → mathematically verified replay
-  → lossless frames → MP4; repeat replay yields identical *logical-state*
-  hashes, video has correct endpoints, no missing frames, and is playable.
-- Long/pause/resume/cancel/storage-full cases and exact-head AI-CI receipts.
-
-Optional 4K output must be enabled only when the renderer and encoder can
-supply and validate the full frame sequence. Do not claim a successful 4K
-export from the ability to set 4K dimensions in a JSON file.
+Do **not** start the deferred cross-repository framebuffer-motion campaign
+as an accidental prerequisite for this narrow reuse correction.
