@@ -38,3 +38,5 @@ For subsequent context, Robert L. Griess Jr., [*Twelve Sporadic Groups* (1998)](
 ## Further bibliography
 
 The [annotated paper index](papers/BIBLIOGRAPHY.md) follows Griess's bibliography through Witt, Todd, Curtis, Golay, Leech, Conway, Fischer, and later constructions, with original full-text or publisher links and explicit local-versus-external status. No copyrighted book or paper is silently rehosted.
+
+The [cartographic source notes](papers/CARTOGRAPHIC-SOURCES.md) follow the Malle, Zvonkin and NeverEndingBooks references in the 2019 M₁₂ post, with author/conference full-text links, exact source-labeled permutations and later Belyi-function references.
