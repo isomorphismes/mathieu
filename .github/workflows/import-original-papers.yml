@@ -15,27 +15,47 @@ jobs:
     steps:
       - name: Check out Mathieu
         uses: actions/checkout@v4
-      - name: Download complete primary-source scans
+
+      - name: Verify preserved 1861 and 1873 scans and import 1860
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p papers
-          curl --fail --location --silent --show-error --retry 3 --retry-all-errors --max-time 240 \
-            'https://www.numdam.org/item/JMPA_1861_2_6__241_0.pdf' \
-            --output 'papers/Mathieu-1861-Memoire.pdf'
-          curl --fail --location --silent --show-error --retry 3 --retry-all-errors --max-time 240 \
-            'https://www.numdam.org/item/JMPA_1873_2_18__25_0.pdf' \
-            --output 'papers/Mathieu-1873-Fonction-cinq-fois-transitive-24.pdf'
-          python3 -c 'from pathlib import Path; files=list(Path("papers").glob("*.pdf")); assert len(files)==2; [(print(f"{p}: {p.stat().st_size} bytes"), (_ for _ in ()).throw(ValueError(f"Invalid PDF: {p}")) if p.stat().st_size < 5000 or p.read_bytes()[:5] != b"%PDF-" else None) for p in files]'
-          sha256sum papers/*.pdf > papers/SHA256SUMS
-      - name: Commit source scans, unmodified
+          # Preserve the exact previously archived bytes. Do not silently replace
+          # a paper with a changed server response.
+          sha256sum --check papers/SHA256SUMS
+          if [[ ! -e papers/Mathieu-1860-Nombre-de-valeurs.pdf ]]; then
+            curl --fail --location --silent --show-error \
+              --retry 3 --retry-all-errors --max-time 240 \
+              'https://www.numdam.org/item/JMPA_1860_2_5__9_0.pdf' \
+              --output papers/Mathieu-1860-Nombre-de-valeurs.pdf
+          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          expected = {
+              'Mathieu-1860-Nombre-de-valeurs.pdf',
+              'Mathieu-1861-Memoire.pdf',
+              'Mathieu-1873-Fonction-cinq-fois-transitive-24.pdf',
+          }
+          files = list(Path('papers').glob('*.pdf'))
+          assert {p.name for p in files} == expected, files
+          for path in files:
+              with path.open('rb') as file:
+                  header = file.read(5)
+              assert header == b'%PDF-', f'{path}: not a PDF'
+              assert path.stat().st_size > 5000, f'{path}: suspiciously short'
+              print(f'{path}: {path.stat().st_size} bytes')
+          PY
+          LC_ALL=C sha256sum papers/Mathieu-*.pdf > papers/SHA256SUMS
+          sha256sum --check papers/SHA256SUMS
+
+      - name: Commit unmodified 1860 scan and checksums
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add papers/
+          git add -- papers/Mathieu-1860-Nombre-de-valeurs.pdf papers/SHA256SUMS
           if ! git diff --cached --quiet; then
-            git commit -m 'Add original Mathieu 1861 and 1873 scanned papers'
+            git commit -m 'Preserve original Mathieu 1860 scan and SHA-256 provenance'
             git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
