@@ -83,6 +83,7 @@ class MathieuExportTests(unittest.TestCase):
 
     def test_event_order_rejected(self):
         self.manifest["events"][1]["frame"] = 3
+        self.manifest["events"][2]["frame"] = 2
         with self.assertRaisesRegex(CaptureError, "ordered"):
             validate_manifest(self.manifest)
 
