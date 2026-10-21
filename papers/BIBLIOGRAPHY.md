@@ -44,6 +44,20 @@ These follow citations or mathematical constructions in the first-hop works; do 
 | J. H. Conway, N. D. Elkies, J. L. Martin, *The Mathieu group M12 and its pseudogroup extension M13* (2006) | [Author PDF](https://jlmartin.ku.edu/papers/mathieu.pdf) | Twelve counters and a moving hole on 13 points |
 | P. Freyd, *The Golay Codes* (2020) | [Author PDF](https://www2.math.upenn.edu/~pjf/golay.pdf) | Combinatorial Golay construction |
 
+## Cartographic sources from the user's 2019 post
+
+The [annotated cartographic reading notes](CARTOGRAPHIC-SOURCES.md) follow [the user's M₁₂ post](https://x.com/isomorphisms/status/1153999879448027138). These are an additional source trail, not assertions that they belong to Griess's bibliography.
+
+| Work | Access | Reading target |
+| --- | --- | --- |
+| G. Malle, Luminy conference talk, April 1993 | Attribution in Zvonkin's Example 1.2 | Six-edge M₁₂ example; no separate paper identified |
+| A. Zvonkin, *How to draw a group?* (1998), *Discrete Mathematics* **180**, 403–413 | [DOI](https://doi.org/10.1016/S0012-365X(97)00128-3) · [author PDF](https://www.labri.fr/perso/zvonkin/Research/drawgroup.pdf) · [earlier FPSAC version](https://fpsac-archive.github.io/FPSAC95/ARTICLES/61.ZVONKIN.pdf) | Edge crossing, vertex rotation and M₁₂ |
+| N. Hanusse, A. Zvonkin, *Cartographic generation of Mathieu groups* (1999), FPSAC, 241–253 | [Author PDF](https://www.labri.fr/perso/zvonkin/Research/mathieu.pdf) · [conference PDF](https://fpsac-archive.github.io/FPSAC99/ARTICLES/25Hanusse.pdf) | Maps, hypermaps and exact generating triples |
+| L. Le Bruyn, *Monsieur Mathieu* | [Article](https://www.neverendingbooks.org/monsieur-mathieu) | Linked in the post; article retrieval failed on 2026-10-21 |
+| N. M. Adrianov, A. M. Vatuzov, *Belyi functions of the special weighted trees of (2,3)-type* (2023) | [arXiv v1](https://arxiv.org/abs/2401.00183v1) · [full HTML](https://arxiv.org/html/2401.00183v1) | Orbits 12.5 and 24.1; later exact algebraic functions |
+
+All full texts above remain external. The notes preserve the two M₁₂ examples' distinct coordinates and identify the ATLAS conversion as unverified.
+
 ## Independent reference data
 
 - [Online ATLAS: degree-24 permutation representation of M24](https://brauer.maths.qmul.ac.uk/Atlas/v3/permrep/M24G1-p24B0); suitable for exact permutation-word test fixtures, not just illustrations.
