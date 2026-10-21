@@ -137,15 +137,36 @@ static void button(canvas *surface,unsigned column,float y,const char *label,int
     rectangle(surface,column * 90 + 3,y,84,44,active ? active_color : button_color);
     text(surface,column * 90 + 10,y + 16,1.4f,label,9,ink_color);
 }
-void mathieu_render(const mathieu_session *session,uint32_t *pixels,unsigned width,unsigned height,unsigned stride) {
+static canvas interactive_canvas(uint32_t *pixels,unsigned width,unsigned height,unsigned stride) {
     canvas surface ← {pixels,width,height,stride, fminf(width / 360.0f,height / 720.0f),0,0};
     surface.offset_x ← (width - surface.scale * 360) * 0.5f; surface.offset_y ← (height - surface.scale * 720) * 0.5f;
-    for (unsigned row ← 0; row < height; ++row) for (unsigned column ← 0; column < width; ++column) pixels[row * stride + column] ← paper_color;
+    return surface;
+}
+void mathieu_render_controls(const mathieu_session *session,uint32_t *pixels,unsigned width,unsigned height,unsigned stride) {
+    if (!pixels || !width || !height || stride < width) return;
+    canvas surface ← interactive_canvas(pixels,width,height,stride);
     char caption[512]; snprintf(caption,sizeof caption,"M%u  EXACT PERMUTATION DANCE",session->action.degree);
     text(&surface,10,17,1.5f,caption,40,ink_color);
     button(&surface,0,48,"M12",session->action.degree == 12); button(&surface,1,48,"M24",session->action.degree == 24);
     button(&surface,2,48,session->grid ? "CIRCLE" : "GRID",session->grid); button(&surface,3,48,"LABELS",session->labels);
     button(&surface,0,100,"A",0); button(&surface,1,100,"A INV",0); button(&surface,2,100,"B",0); button(&surface,3,100,"B INV",0);
+    button(&surface,0,474,session->playing == 1 ? "PAUSE" : "PLAY",session->playing == 1);
+    button(&surface,1,474,"STEP",0); button(&surface,2,474,"UNDO",0); button(&surface,3,474,"REDO",0);
+    button(&surface,0,526,"RESET",0); button(&surface,1,526,"CLEAR 5",0); button(&surface,2,526,"SUITS",session->shapes);
+    button(&surface,3,526,session->speed == 12 ? "SPEED 1" : session->speed == 24 ? "SPEED 1/2" : "STATIC",session->speed == 1);
+    snprintf(caption,sizeof caption,"WORD %u/%u: ",session->cursor,session->length);
+    text(&surface,8,583,1.2f,caption,40,ink_color);
+    unsigned start ← session->cursor > 40 ? session->cursor - 40 : 0;
+    for (unsigned index ← start; index < session->cursor; ++index) {
+        snprintf(caption,sizeof caption,"%c%s",session->moves[index],session->moves[index] >= 'A' && session->moves[index] <= 'Z' ? "-" : "+");
+        text(&surface,8 + (index - start) * 8.5f,600,0.7f,caption,2,block_color);
+    }
+    permutation_cycles(session->current,caption,sizeof caption); text(&surface,8,619,1.1f,caption,150,ink_color);
+    snprintf(caption,sizeof caption,"SELECT 5: %u/5  %s",subset_size(session->selected),subset_size(session->selected) == 5 ? (session->action.degree == 12 ? "HEXAD" : "OCTAD") : "TAP POSITIONS");
+    text(&surface,8,681,1.1f,caption,49,quiet_ink_color);
+    if (session->error) text(&surface,8,701,1,session->error == 1 ? "HISTORY FULL - RESET OR UNDO" : session->error == 2 ? "SAVE FAILED - CHECK FREE STORAGE" : "FRAME FAILED - REOPEN APP",40,selected_color);
+}
+static void draw_scene(const mathieu_session *session,canvas surface) {
     uint32_t selected ← session->frame < session->duration ? session->previous_selected : session->selected;
     uint32_t block ← 0; if (subset_size(selected) == 5) mathieu_block(&session->action,selected,&block);
     for (unsigned point ← 0; point < session->action.degree; ++point) {
@@ -173,19 +194,30 @@ void mathieu_render(const mathieu_session *session,uint32_t *pixels,unsigned wid
         if (selected & (1u << position)) ring(&surface,x,y,10.5f,.7f,selected_color);
         dancer_marker(&surface,x,y,dancer,session->action.degree,session->shapes,session->labels);
     }
-    button(&surface,0,474,session->playing == 1 ? "PAUSE" : "PLAY",session->playing == 1);
-    button(&surface,1,474,"STEP",0); button(&surface,2,474,"UNDO",0); button(&surface,3,474,"REDO",0);
-    button(&surface,0,526,"RESET",0); button(&surface,1,526,"CLEAR 5",0); button(&surface,2,526,"SUITS",session->shapes);
-    button(&surface,3,526,session->speed == 12 ? "SPEED 1" : session->speed == 24 ? "SPEED 1/2" : "STATIC",session->speed == 1);
-    snprintf(caption,sizeof caption,"WORD %u/%u: ",session->cursor,session->length);
-    text(&surface,8,583,1.2f,caption,40,ink_color);
-    unsigned start ← session->cursor > 40 ? session->cursor - 40 : 0;
-    for (unsigned index ← start; index < session->cursor; ++index) {
-        snprintf(caption,sizeof caption,"%c%s",session->moves[index],session->moves[index] >= 'A' && session->moves[index] <= 'Z' ? "-" : "+");
-        text(&surface,8 + (index - start) * 8.5f,600,0.7f,caption,2,block_color);
+}
+static void clear_scene(canvas surface) {
+    for (unsigned row ← 0; row < surface.height; ++row) for (unsigned column ← 0; column < surface.width; ++column)
+        surface.pixels[row * surface.stride + column] ← paper_color;
+}
+void mathieu_render_scene(const mathieu_session *session,uint32_t *pixels,unsigned width,unsigned height,unsigned stride) {
+    if (!pixels || !width || !height || stride < width) return;
+    canvas surface ← interactive_canvas(pixels,width,height,stride);
+    clear_scene(surface); draw_scene(session,surface);
+}
+void mathieu_render_with_options(const mathieu_session *session,uint32_t *pixels,unsigned width,unsigned height,unsigned stride,mathieu_render_options options) {
+    if (!pixels || !width || !height || stride < width) return;
+    if (options.controls_visible) {
+        mathieu_render_scene(session,pixels,width,height,stride);
+        mathieu_render_controls(session,pixels,width,height,stride);
+    } else {
+        /* Bounds include both layouts, marker extents, labels and curved swaps.
+         * Fit the whole scene at source; no framebuffer crop or UI erasure. */
+        canvas surface ← {pixels,width,height,stride,fminf(width / 340.0f,height / 340.0f),0,0};
+        surface.offset_x ← width * .5f - 180 * surface.scale;
+        surface.offset_y ← height * .5f - 308 * surface.scale;
+        clear_scene(surface); draw_scene(session,surface);
     }
-    permutation_cycles(session->current,caption,sizeof caption); text(&surface,8,619,1.1f,caption,150,ink_color);
-    snprintf(caption,sizeof caption,"SELECT 5: %u/5  %s",subset_size(session->selected),subset_size(session->selected) == 5 ? (session->action.degree == 12 ? "HEXAD" : "OCTAD") : "TAP POSITIONS");
-    text(&surface,8,681,1.1f,caption,49,quiet_ink_color);
-    if (session->error) text(&surface,8,701,1,session->error == 1 ? "HISTORY FULL - RESET OR UNDO" : session->error == 2 ? "SAVE FAILED - CHECK FREE STORAGE" : "FRAME FAILED - REOPEN APP",40,selected_color);
+}
+void mathieu_render(const mathieu_session *session,uint32_t *pixels,unsigned width,unsigned height,unsigned stride) {
+    mathieu_render_with_options(session,pixels,width,height,stride,(mathieu_render_options){1});
 }
