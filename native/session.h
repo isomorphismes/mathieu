@@ -1,7 +1,7 @@
 #ifndef MATHIEU_SESSION_H
 #define MATHIEU_SESSION_H
 #include "mathieu.h"
-enum { SESSION_MOVES = 4096 };
+enum { SESSION_MOVES = 4096, SESSION_CHECKPOINT_MAX = SESSION_MOVES + 124 };
 typedef struct {
     mathieu_action action;
     permutation current, previous, motion;
@@ -23,4 +23,9 @@ int session_select(mathieu_session *session, unsigned point);
 void session_position(const mathieu_session *session, unsigned point, float *x, float *y);
 void session_dancer(const mathieu_session *session, unsigned dancer, float *x, float *y);
 int session_tap(mathieu_session *session, float x, float y);
+/* Versioned little-endian bytes, never a dump of compiler-dependent structs.
+ * Restore validates the complete word and the interrupted generator action,
+ * and leaves the destination unchanged on malformed or corrupt input. */
+size_t session_checkpoint(const mathieu_session *session, uint8_t *bytes, size_t capacity);
+int session_restore(mathieu_session *session, const uint8_t *bytes, size_t length);
 #endif

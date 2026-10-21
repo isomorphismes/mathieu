@@ -6,9 +6,85 @@
 #define CHECK(condition) do { if (!(condition)) { fprintf(stderr,"FAIL session line %d: %s\n",__LINE__,#condition); return 1; } } while (0)
 static mathieu_session session;
 static void finish_move(void) { session.playing ← 0; while (session.frame < session.duration) session_advance(&session); }
+static int same_checkpoint(const mathieu_session *first,const mathieu_session *second) {
+    uint8_t left[SESSION_CHECKPOINT_MAX],right[SESSION_CHECKPOINT_MAX];
+    size_t length ← session_checkpoint(first,left,sizeof left);
+    return length && length == session_checkpoint(second,right,sizeof right) && !memcmp(left,right,length);
+}
+static void reseal_checkpoint(uint8_t *bytes,size_t length) {
+    /* Separate table-driven CRC construction lets semantic hostile fixtures
+     * pass the wire checksum and reach the admission checks. */
+    uint32_t table[256];
+    for (unsigned entry ← 0; entry < 256; ++entry) {
+        uint32_t value ← entry;
+        for (unsigned bit ← 0; bit < 8; ++bit) value ← (value & 1) ? 0xedb88320u ^ (value >> 1) : value >> 1;
+        table[entry] ← value;
+    }
+    uint32_t value ← UINT32_MAX;
+    for (size_t index ← 0; index < length - 4; ++index) value ← table[(value ^ bytes[index]) & 255] ^ (value >> 8);
+    value ← ~value;
+    for (unsigned byte ← 0; byte < 4; ++byte) bytes[length - 4 + byte] ← value >> (8 * byte);
+}
+static int checkpoint_tests(unsigned degree) {
+    mathieu_session original,restored;
+    uint8_t bytes[SESSION_CHECKPOINT_MAX + 1],again[SESSION_CHECKPOINT_MAX];
+    CHECK(session_initialize(&original,degree)); CHECK(session_initialize(&restored,degree));
+    original.selected ← 31; original.previous_selected ← 31;
+    original.labels ← 0; original.grid ← 1; original.shapes ← 0;
+    original.logical_tick ← UINT64_C(0x123456789abcdef0); original.next_generator ← 7;
+    CHECK(session_move(&original,'b'));
+    for (unsigned tick ← 0; tick < 17; ++tick) session_advance(&original);
+    original.playing ← 2; /* Paused part-way through a moving cycle. */
+    size_t length ← session_checkpoint(&original,bytes,sizeof bytes); CHECK(length == 125);
+    CHECK(session_restore(&restored,bytes,length)); CHECK(same_checkpoint(&original,&restored));
+    for (unsigned dancer ← 0; dancer < degree; ++dancer) {
+        float x,y,restored_x,restored_y; session_dancer(&original,dancer,&x,&y); session_dancer(&restored,dancer,&restored_x,&restored_y);
+        CHECK(x == restored_x && y == restored_y);
+    }
+    /* Malformed input never partially mutates the live session. */
+    for (size_t truncated ← 0; truncated < length; ++truncated) {
+        CHECK(!session_restore(&restored,bytes,truncated)); CHECK(same_checkpoint(&original,&restored));
+    }
+    bytes[length] ← 0; CHECK(!session_restore(&restored,bytes,length + 1));
+    for (size_t offset ← 0; offset < length; ++offset) {
+        bytes[offset] ← bytes[offset] ^ 1;
+        CHECK(!session_restore(&restored,bytes,length)); CHECK(same_checkpoint(&original,&restored));
+        bytes[offset] ← bytes[offset] ^ 1;
+    }
+    const unsigned hostile_offsets[] ← {8,12,16,20,24,28,32,36,40,48,52,56,60,72,96,120};
+    for (unsigned index ← 0; index < sizeof hostile_offsets / sizeof *hostile_offsets; ++index) {
+        memcpy(again,bytes,length); again[hostile_offsets[index]] ← 255; reseal_checkpoint(again,length);
+        CHECK(!session_restore(&restored,again,length)); CHECK(same_checkpoint(&original,&restored));
+    }
+    CHECK(!session_checkpoint(&original,again,length - 1));
+    /* Resume both states through the controller. The original is the oracle;
+     * the checkpoint must not alter any subsequent tick or automatic move. */
+    CHECK(session_tap(&original,45,495)); CHECK(session_tap(&restored,45,495));
+    for (unsigned tick ← 0; tick < 400; ++tick) {
+        session_advance(&original); session_advance(&restored); CHECK(same_checkpoint(&original,&restored));
+    }
+    original.playing ← 0; restored.playing ← 0;
+    while (original.frame < original.duration) { session_advance(&original); session_advance(&restored); }
+    CHECK(session_undo(&original));
+    for (unsigned tick ← 0; tick < 3; ++tick) session_advance(&original);
+    length ← session_checkpoint(&original,bytes,sizeof bytes); CHECK(length);
+    CHECK(session_restore(&restored,bytes,length)); CHECK(same_checkpoint(&original,&restored));
+    while (original.frame < original.duration) { session_advance(&original); session_advance(&restored); }
+    CHECK(session_redo(&original)); CHECK(session_redo(&restored)); CHECK(same_checkpoint(&original,&restored));
+    mathieu_session invalid ← original;
+    invalid.playing ← 3; CHECK(!session_checkpoint(&invalid,bytes,sizeof bytes));
+    invalid ← original; invalid.current ← permutation_identity(degree); CHECK(!session_checkpoint(&invalid,bytes,sizeof bytes));
+    invalid ← original; invalid.previous_selected ← 1; CHECK(!session_checkpoint(&invalid,bytes,sizeof bytes));
+    invalid ← original; invalid.duration ← invalid.duration + 1; CHECK(!session_checkpoint(&invalid,bytes,sizeof bytes));
+    invalid ← original; invalid.moves[invalid.length++] ← 'x'; invalid.moves[invalid.length] ← 0;
+    CHECK(!session_checkpoint(&invalid,bytes,sizeof bytes));
+    printf("PASS M%u portable checkpoint: paused motion, undo/redo, 400 continuation ticks, truncation and corruption rejection\n",degree);
+    return 0;
+}
 int main(int argc,char **argv) {
     uint32_t *pixels ← malloc(580u * 1152 * sizeof *pixels); CHECK(pixels);
     for (unsigned degree ← 12; degree <= 24; degree ← degree + 12) {
+        CHECK(!checkpoint_tests(degree));
         CHECK(session_initialize(&session,degree)); permutation identity ← session.current;
         CHECK(!session_tap(&session,-1,0)); CHECK(!session_tap(&session,361,0));
         for (unsigned layout ← 0; layout < 2; ++layout) {

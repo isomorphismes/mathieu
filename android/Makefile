@@ -22,7 +22,7 @@ BUILTIN = $(shell "$(ICK_ANDROID)" $(ICK_PREFIX) -print-file-name=include)
 OPT_Debug = -O0 -g -gdwarf-4 -gno-variable-location-views
 OPT_Release = -O2 -DNDEBUG
 APP_FLAGS = $(ICK_PREFIX) $(FLAGS_$(ABI)) --sysroot=$(SYSROOT) -nostdinc -isystem $(BUILTIN) -isystem $(SYSROOT)/usr/include -isystem $(SYSROOT)/usr/include/$(HEADER_$(ABI)) -I$(NDK)/sources/android/native_app_glue -D__ANDROID__ -D__ANDROID_API__=26 -D__ANDROID_MIN_SDK_VERSION__=26 -DBIONIC_IOCTL_NO_SIGNEDNESS_OVERLOAD -std=c11 -fPIC -Wall -Wextra -Werror $(OPT_$(PROFILE))
-OBJECTS = $(OUT)/native/mathieu.o $(OUT)/native/session.o $(OUT)/native/render.o $(OUT)/android/activity.o $(OUT)/glue.o
+OBJECTS = $(OUT)/native/mathieu.o $(OUT)/native/session.o $(OUT)/native/checkpoint.o $(OUT)/native/render.o $(OUT)/android/activity.o $(OUT)/glue.o
 .SECONDARY:
 .PHONY: library FORCE
 FORCE:

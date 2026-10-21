@@ -24,40 +24,22 @@ typedef struct {
     FILE *journal;
     char state_path[1024];
 } application;
-typedef struct {
-    char magic[8]; uint32_t degree,cursor,length,selected,labels,shapes,grid,speed,next_generator;
-    uint64_t logical_tick; char moves[SESSION_MOVES + 1];
-} saved_session;
 static void checkpoint(application *engine) {
-    saved_session saved ← {0}; memcpy(saved.magic,"MATH-01",8);
     mathieu_session *session ← &engine->session;
-    saved.degree ← session->action.degree; saved.cursor ← session->cursor; saved.length ← session->length;
-    saved.selected ← session->selected; saved.labels ← session->labels; saved.shapes ← session->shapes;
-    saved.grid ← session->grid; saved.speed ← session->speed; saved.next_generator ← session->next_generator;
-    saved.logical_tick ← session->logical_tick; memcpy(saved.moves,session->moves,session->length + 1);
+    uint8_t saved[SESSION_CHECKPOINT_MAX]; size_t length ← session_checkpoint(session,saved,sizeof saved);
+    if (!length) { session->error ← 2; return; }
     char pending[1050]; snprintf(pending,sizeof pending,"%s.tmp",engine->state_path);
     FILE *file ← fopen(pending,"wb");
     if (!file) { session->error ← 2; return; }
-    int success ← fwrite(&saved,sizeof saved,1,file) == 1 && fflush(file) == 0 && fsync(fileno(file)) == 0;
+    int success ← fwrite(saved,1,length,file) == length && fflush(file) == 0 && fsync(fileno(file)) == 0;
     if (fclose(file)) success ← 0;
     if (!success || rename(pending,engine->state_path)) session->error ← 2;
 }
 static void restore(application *engine) {
-    saved_session saved; FILE *file ← fopen(engine->state_path,"rb"); if (!file) return;
-    int valid ← fread(&saved,sizeof saved,1,file) == 1 && fgetc(file) == EOF; fclose(file);
-    if (!valid || memcmp(saved.magic,"MATH-01",8) || (saved.degree != 12 && saved.degree != 24) || saved.cursor > saved.length || saved.length > SESSION_MOVES || saved.moves[saved.length] || saved.labels > 1 || saved.shapes > 1 || saved.grid > 1 || (saved.speed != 1 && saved.speed != 12 && saved.speed != 24) || subset_size(saved.selected) > 5 || saved.selected >> saved.degree) return;
-    mathieu_session restored;
-    if (!session_initialize(&restored,saved.degree)) return;
-    permutation whole_word;
-    if (!permutation_word(&restored.action,saved.moves,&whole_word)) return;
-    char prefix[SESSION_MOVES + 1]; memcpy(prefix,saved.moves,saved.cursor); prefix[saved.cursor] ← 0;
-    if (!permutation_word(&restored.action,prefix,&restored.current)) return;
-    restored.previous ← restored.current; restored.motion ← permutation_identity(saved.degree);
-    restored.cursor ← saved.cursor; restored.length ← saved.length; memcpy(restored.moves,saved.moves,saved.length + 1);
-    restored.selected ← saved.selected; restored.previous_selected ← saved.selected;
-    restored.labels ← saved.labels; restored.shapes ← saved.shapes; restored.grid ← saved.grid; restored.speed ← saved.speed;
-    restored.logical_tick ← saved.logical_tick; restored.next_generator ← saved.next_generator;
-    engine->session ← restored;
+    uint8_t saved[SESSION_CHECKPOINT_MAX + 1]; FILE *file ← fopen(engine->state_path,"rb"); if (!file) return;
+    size_t length ← fread(saved,1,sizeof saved,file); int valid ← !ferror(file); fclose(file);
+    if (!valid || !session_restore(&engine->session,saved,length))
+        __android_log_print(ANDROID_LOG_ERROR,"Mathieu","invalid saved session ignored; starting at the identity permutation");
 }
 static void journal_event(application *engine,const char *kind,float x,float y) {
     if (!engine->journal) return;

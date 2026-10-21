@@ -15,6 +15,6 @@ reference: $(OUT)/engine-test
 $(OUT)/engine-test: native/mathieu.c native/mathieu.h tests/engine.c
 	mkdir -p $(OUT)
 	$(ICK) $(CFLAGS) native/mathieu.c tests/engine.c -o $@
-$(OUT)/session-test: native/mathieu.c native/mathieu.h native/session.c native/session.h native/render.c native/render.h tests/session.c
+$(OUT)/session-test: native/mathieu.c native/mathieu.h native/session.c native/session.h native/checkpoint.c native/render.c native/render.h tests/session.c
 	mkdir -p $(OUT)
-	$(ICK) $(CFLAGS) native/mathieu.c native/session.c native/render.c tests/session.c -lm -o $@
+	$(ICK) $(CFLAGS) native/mathieu.c native/session.c native/checkpoint.c native/render.c tests/session.c -lm -o $@
