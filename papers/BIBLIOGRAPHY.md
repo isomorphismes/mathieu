@@ -12,7 +12,7 @@ This bibliography follows the Mathieu-group, Golay-code, Steiner-system and perm
 | 1861 | É. Mathieu, *Mémoire sur l'étude des fonctions de plusieurs quantités, sur la manière de les former et sur les substitutions qui les laissent invariables*, *J. Math. Pures Appl.* 2e sér. **6**, 241–323 | [Numdam PDF](https://www.numdam.org/item/JMPA_1861_2_6__241_0.pdf) | [Mathieu-1861-Memoire.pdf](Mathieu-1861-Memoire.pdf) | The twelve-point groups |
 | 1873 | É. Mathieu, *Sur la fonction cinq fois transitive de 24 quantités*, *J. Math. Pures Appl.* 2e sér. **18**, 25–46 | [Numdam PDF](https://www.numdam.org/item/JMPA_1873_2_18__25_0.pdf) | [Mathieu-1873-Fonction-cinq-fois-transitive-24.pdf](Mathieu-1873-Fonction-cinq-fois-transitive-24.pdf) | The 24-point group |
 
-The 1860 scan is imported by the repository's `import-original-papers` workflow. If the linked file has not appeared yet, its import/verification is still outstanding; a bibliography link alone is not archival acceptance.
+All three complete scans are stored here. The read-only archive workflow checks their fixed identities, the checksum inventory and local documentation links through checked Ithon. It does not fetch replacement scans or automatically commit server responses.
 
 ## First hop — references used by Griess (external, not stored)
 

@@ -1,0 +1,68 @@
+"""Read-only archive checks: bytes and local links, with no build/device gate."""
+import hashlib
+import re
+import sys
+from pathlib import Path
+from builtins import dict, list, ValueError
+
+def verify(root ∈ object) → list[list[str]]:
+    expected ∈ dict[str,str] ← {'Mathieu-1860-Nombre-de-valeurs.pdf':'0c4fb60b0766b00b4c67cadf8cdf2ed550196d0f4a7685bb95ade4d2e61f58c7','Mathieu-1861-Memoire.pdf':'8646b3f57bf294743678bb33237ff301c19e806f11bd5d0319bb791bed6345e2','Mathieu-1873-Fonction-cinq-fois-transitive-24.pdf':'da299c8c785d0beb4c40164a68175384bf5e406997b8c9b7a926eb03b712ca27'}
+    papers ∈ object ← root.joinpath('papers')
+    files ∈ list[object] ← list(papers.glob('*.pdf'))
+    names ∈ list[str] ← []
+    for path in files:
+        names.append(str(path.name))
+    if len(names) != 3:
+        raise ValueError('archive must contain exactly the three historical PDFs')
+    receipt ∈ list[list[str]] ← [['scope','documentation-archive'],['software_build','NOT_APPLICABLE'],['Android','NOT_APPLICABLE']]
+    for name in expected:
+        path ∈ object ← papers.joinpath(name)
+        if bool(path.is_symlink()) or not bool(path.is_file()):
+            raise ValueError('missing regular historical PDF: ' + name)
+        data ∈ bytes ← path.read_bytes()
+        if len(data) < 5000 or data[:5] != b'%PDF-':
+            raise ValueError('invalid complete PDF: ' + name)
+        digest ∈ str ← str(hashlib.sha256(data).hexdigest())
+        if digest != expected[name]:
+            raise ValueError('historical PDF checksum changed: ' + name)
+        receipt.append([name,digest,str(len(data))])
+    recorded ∈ dict[str,str] ← {}
+    lines ∈ list[str] ← papers.joinpath('SHA256SUMS').read_text().splitlines()
+    for line in lines:
+        fields ∈ list[str] ← line.split()
+        if len(fields) != 2 or bool(recorded.__contains__(fields[1])):
+            raise ValueError('malformed or duplicate SHA256SUMS row')
+        recorded[fields[1]] ← fields[0]
+    if len(recorded) != 3:
+        raise ValueError('wrong checksum inventory')
+    for name in expected:
+        if str(recorded.get('papers/' + name,'')) != expected[name]:
+            raise ValueError('checksum manifest differs from accepted scan identity')
+    documents ∈ list[object] ← [root.joinpath('README.md'),papers.joinpath('BIBLIOGRAPHY.md'),papers.joinpath('CARTOGRAPHIC-SOURCES.md')]
+    for document in documents:
+        text ∈ str ← document.read_text()
+        targets ∈ list[str] ← re.findall(r'\]\(([^)]+)\)',text)
+        for target in targets:
+            if bool(target.startswith('https://')) or bool(target.startswith('http://')) or bool(target.startswith('#')):
+                continue
+            parts ∈ list[str] ← target.split('#',1)
+            path ∈ object ← document.parent.joinpath(parts[0])
+            if not bool(path.exists()):
+                raise ValueError('broken local document link: ' + target)
+        receipt.append([str(document.relative_to(root)),'LOCAL_LINKS_PASS'])
+    return receipt
+
+def main() → None:
+    arguments ∈ list[str] ← list(sys.argv)
+    root ∈ object ← Path(__file__).resolve().parent.parent
+    if len(arguments) == 2:
+        root ← Path(arguments[1]).resolve()
+    elif len(arguments) > 2:
+        raise ValueError('usage: verify.pi [ARCHIVE_ROOT]')
+    result ∈ list[list[str]] ← verify(root)
+    for row in result:
+        print('\t'.join(row))
+    print('PASS exact historical scans, checksum inventory and local documentation links')
+
+if __name__ == '__main__':
+    main()
