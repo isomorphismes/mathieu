@@ -1,0 +1,59 @@
+module ExactPermutations
+
+import Data.List
+import Data.Fin
+import Data.Maybe
+import System
+
+data Permutation = Permutes (List Number)
+
+point_indices : Number → List Number
+point_indices Z = []
+point_indices (S count) = point_indices count ++ [count]
+
+permutation_on : Number → List Number → Maybe Permutation
+permutation_on degree images =
+  if sort images ≟ point_indices degree then Just (Permutes images) else Nothing
+
+image_at : Number → List Number → Maybe Number
+image_at position [] = Nothing
+image_at Z (image :: remaining) = Just image
+image_at (S position) (image :: remaining) = image_at position remaining
+
+followed_by : Permutation → Permutation → Maybe Permutation
+followed_by (Permutes first) (Permutes second) = do
+  if length first ≟ length second then pure () else Nothing
+  images ← traverse (\point => image_at point second) first
+  permutation_on (length first) images
+
+inverse : Permutation → Maybe Permutation
+inverse (Permutes images) = do
+  reversed ← traverse (\point => map finToNat (findIndex (\image => image ≟ point) images)) (point_indices (length images))
+  permutation_on (length images) reversed
+
+same_images : Permutation → Permutation → Bool
+same_images (Permutes first) (Permutes second) = first ≟ second
+
+require : Text → Bool → IO ()
+require name success = if success then pure () else do
+  putStrLn ("FAIL " ++ name)
+  exitFailure
+
+main : IO ()
+main = do
+  require "duplicate admission" (isNothing (permutation_on 3 [0,0,2]))
+  require "range admission" (isNothing (permutation_on 3 [0,1,3]))
+  case (permutation_on 12 [3,1,9,0,10,11,6,7,8,2,4,5],
+        permutation_on 12 [7,2,3,1,11,9,5,8,0,6,4,10],
+        permutation_on 12 (point_indices 12)) of
+    (Just first, Just second, Just identity) => do
+      case inverse second of
+        Just reversed => case followed_by second reversed of
+          Just restored => require "inverse" (same_images restored identity)
+          Nothing => require "composition admission" False
+        Nothing => require "inverse admission" False
+      case (followed_by first second, followed_by second first) of
+        (Just forward, Just backward) => require "noncommuting generators" (not (same_images forward backward))
+        _ => require "composition admission" False
+      putStrLn "PASS exact Idriç permutation admission, inverse and composition"
+    _ => require "ATLAS generator admission" False

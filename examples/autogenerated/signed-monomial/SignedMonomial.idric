@@ -1,0 +1,73 @@
+module SignedMonomial
+
+import Data.List
+import Data.Fin
+import Data.Maybe
+import System
+
+data SignedOperator = SendsBasis (List (Number, Integer))
+
+point_indices : Number → List Number
+point_indices Z = []
+point_indices (S count) = point_indices count ++ [count]
+
+signed_on : Number → List (Number, Integer) → Maybe SignedOperator
+signed_on degree images =
+  if sort (map fst images) ≟ point_indices degree &&
+     all (\image => snd image ≟ 1 || snd image ≟ -1) images
+  then Just (SendsBasis images) else Nothing
+
+image_at : Number → List value → Maybe value
+image_at position [] = Nothing
+image_at Z (image :: remaining) = Just image
+image_at (S position) (image :: remaining) = image_at position remaining
+
+follow_image : List (Number, Integer) → (Number, Integer) → Maybe (Number, Integer)
+follow_image second (destination, sign) = do
+  (next_destination, next_sign) ← image_at destination second
+  pure (next_destination, sign * next_sign)
+
+followed_by : SignedOperator → SignedOperator → Maybe SignedOperator
+followed_by (SendsBasis first) (SendsBasis second) = do
+  if length first ≟ length second then pure () else Nothing
+  images ← traverse (follow_image second) first
+  signed_on (length first) images
+
+inverse_image : List (Number, Integer) → Number → Maybe (Number, Integer)
+inverse_image images destination = do
+  source ← map finToNat (findIndex (\image => fst image ≟ destination) images)
+  (_, sign) ← image_at source images
+  pure (source, sign)
+
+inverse : SignedOperator → Maybe SignedOperator
+inverse (SendsBasis images) = do
+  reversed ← traverse (inverse_image images) (point_indices (length images))
+  signed_on (length images) reversed
+
+same_images : SignedOperator → SignedOperator → Bool
+same_images (SendsBasis first) (SendsBasis second) = first ≟ second
+
+require : Text → Bool → IO ()
+require name success = if success then pure () else do
+  putStrLn ("FAIL " ++ name)
+  exitFailure
+
+main : IO ()
+main = do
+  require "duplicate destination" (isNothing (signed_on 2 [(0,1),(0,-1)]))
+  require "zero sign" (isNothing (signed_on 2 [(0,0),(1,1)]))
+  case (signed_on 2 [(1,1),(0,-1)], signed_on 2 [(0,-1),(1,-1)], signed_on 2 [(0,1),(1,1)]) of
+    (Just quarter_turn, Just negative_identity, Just identity) => do
+      case followed_by quarter_turn quarter_turn of
+        Just square => require "signed square" (same_images square negative_identity)
+        Nothing => require "square admission" False
+      case inverse quarter_turn of
+        Just reversed => case followed_by quarter_turn reversed of
+          Just restored => require "inverse" (same_images restored identity)
+          Nothing => require "inverse product" False
+        Nothing => require "inverse admission" False
+      case inverse negative_identity of
+        Just reversed => require "negative fixed points" (same_images reversed negative_identity)
+        Nothing => require "negative fixed point admission" False
+      putStrLn "PASS signed Idriç composition, inverse and negative fixed points"
+    _ => require "operator admission" False

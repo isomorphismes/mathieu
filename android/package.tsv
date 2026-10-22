@@ -1,0 +1,7 @@
+package	org.isomorphisms.mathieu
+label	Mathieu
+version_code	2
+version_name	0.1.1-development
+min_sdk	26
+target_sdk	35
+signing_lane	public-development
