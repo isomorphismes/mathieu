@@ -1,5 +1,10 @@
 # Mathieu agent instructions
 
+Read the shared isomorphisms/ai-ci/AGENTS.md source and evidence rules. New
+Python-family source is checked Ithon (.pi), including tests and owned imports.
+Documentation/archive acceptance concerns source integrity and provenance;
+Android and physical-device receipts apply only to Android/device claims.
+
 ## Mathematical video ownership (mandatory)
 
 For generated movies, Mathieu owns the *mathematical action*, generator

@@ -1,0 +1,58 @@
+"""Run the existing FP planned-movie operation; no private renderer or encoder."""
+import hashlib
+import os
+import subprocess
+import sys
+from pathlib import Path
+from builtins import dict, list, ValueError
+from export import command
+
+def pairs(path ∈ object) → dict[str,str]:
+    result ∈ dict[str,str] ← {}
+    lines ∈ list[str] ← path.read_text().splitlines()
+    for line in lines:
+        fields ∈ list[str] ← line.split('\t')
+        if len(fields) != 2 or bool(result.__contains__(fields[0])):
+            raise ValueError('invalid or duplicate context/receipt row')
+        result[fields[0]] ← fields[1]
+    return result
+
+def generate(control ∈ object, context_file ∈ object, inputs ∈ object, output ∈ object) → object:
+    paths ∈ list[object] ← [control,context_file,inputs,output]
+    for path in paths:
+        if not bool(path.is_absolute()):
+            raise ValueError('absolute paths required')
+    if bool(output.exists()):
+        raise ValueError('refusing previous or interrupted output')
+    revision ∈ str ← command(['git','-C',str(control),'rev-parse','HEAD']).strip()
+    origin ∈ str ← command(['git','-C',str(control),'remote','get-url','origin']).strip()
+    if revision != '85953de90fecdc6caa8c0b50a3900390cf2c1e20' or origin != 'https://github.com/isomorphisms/flexible-pipes.git':
+        raise ValueError('shared FP source differs from qualified pin')
+    command(['git','-C',str(control),'diff','--exit-code','HEAD','--'])
+    context ∈ dict[str,str] ← pairs(context_file)
+    grease ∈ object ← Path(context['grease'])
+    if not bool(grease.is_absolute()) or not bool(os.access(grease,os.X_OK)):
+        raise ValueError('context requires an executable Grease runtime')
+    environment ∈ dict[str,str] ← dict(os.environ)
+    environment['GREASE_BINARY'] ← str(grease)
+    # This is the existing, pinned FP legacy-controller boundary. All new
+    # maintained consumer source here is checked Ithon; no controller is copied.
+    arguments ∈ list[str] ← [str(sys.executable),str(control.joinpath('scripts/run-pipeline')),'wiggle-video-01','--param','control=' + str(control),'--param','context=' + str(context_file),'--param','inputs=' + str(inputs),'--param','output=' + str(output),'--runs-root',str(output.parent.joinpath(str(output.name) + '-fp-runs'))]
+    subprocess.run(arguments,check=True,env=environment)
+    completion ∈ dict[str,str] ← pairs(output.joinpath('completion.tsv'))
+    acceptance ∈ dict[str,str] ← pairs(output.joinpath('mathieu/acceptance.tsv'))
+    movie ∈ object ← output.joinpath('mathieu/movie.mp4')
+    digest ∈ str ← str(hashlib.sha256(movie.read_bytes()).hexdigest())
+    if completion['offline_examples'] != 'PASS' or acceptance['offline'] != 'PASS' or acceptance['movie_sha256'] != digest:
+        raise ValueError('shared movie was not sealed by independent acceptance')
+    return movie
+
+def main() → None:
+    arguments ∈ list[str] ← list(sys.argv)
+    if len(arguments) != 5:
+        raise ValueError('usage: shared.pi FP_ROOT CONTEXT.tsv INPUTS OUTPUT_ROOT')
+    movie ∈ object ← generate(Path(arguments[1]),Path(arguments[2]),Path(arguments[3]),Path(arguments[4]))
+    print('PASS independently accepted shared movie: ' + str(movie))
+
+if __name__ == '__main__':
+    main()

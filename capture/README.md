@@ -1,91 +1,79 @@
-# Mathieu capture: reuse the shared Kitchen movie pipeline
+# Mathieu capture through checked Ithon and shared Kitchen
 
-**Mathematical ownership:** Mathieu records the user's exact interaction and
-replays its mathematical state into numbered lossless PNG/PPM frames.
+Mathieu owns mathematical state and deterministic source frames. Flexible
+Pipes owns the shared planned-movie operation, AI-CI independently checks its
+results, and Kitchen is the only movie encoder.
 
-**Movie ownership:** `isomorphisms/kitchen/tasks/movie-from-stills/build.sh`
-converts the numbered stills into H.264/yuv420p MP4 using FFmpeg. Do not
-introduce a second encoder, local FFmpeg command, or raw-RGB movie protocol
-in Mathieu. See [Kitchen's canonical contract](https://github.com/isomorphisms/kitchen/blob/main/tasks/movie-from-stills/README.md)
-and [Pauli's existing usage](https://github.com/isomorphismes/pauli/blob/main/AGENTS.md).
+## Real mathematical movies
 
-**Acceptance:** AI-CI must independently inspect the real saved mathematical
-session, exact permutation state, output frames, audio policy (if any) and MP4.
-The repository currently has no Mathieu interaction renderer. This PR
-implements *only the input verification + Kitchen invocation foundation*.
+`capture/shared.pi` calls the existing registered `wiggle-video-01` operation.
+It requires four absolute-path arguments:
 
-## `mathieu.capture.v1` session
-
-Store a UTF-8 JSON manifest plus lossless numbered stills, starting at frame 0.
-
-| Field | Meaning |
+| Argument | Meaning |
 | --- | --- |
-| `format` | `mathieu.capture.v1` |
-| `source_revision` | 40-character lowercase source commit SHA |
-| `width`, `height`, `fps` | Frame size and 24/30/60fps playback clock |
-| `frame_sha256` | One checksum per numbered PNG |
-| `events` | Ordered input records with frame number and event kind |
-| `math.group` | `M11`, `M12`, `M22`, `M23`, or `M24` |
-| `math.generators` | Named exact 0-based permutation arrays |
-| `math.word` | Generator actions in chronological order |
-| `math.final_mapping` | Independently checked composite permutation |
+| FP_ROOT | Verified Flexible Pipes checkout |
+| CONTEXT.tsv | Existing shared operation's resolved engine/runtime locations |
+| INPUTS | Authored motion plans, controls, events and manifests |
+| OUTPUT_ROOT | New output directory; existing/interrupted output is refused |
 
-The eventual recorder must also preserve continuous pointer input
-and timestamps, checkpoints, initial state, selected labels/colors/shapes,
-camera/viewport state, and enough renderer/compiler identities to reproduce
-the exact interaction. The current validator checks a subset of those fields,
-not the full interactive recording contract. A name such as `M24` in a
-manifest does **not** prove that the listed generators belong to that group;
-independent reference fixtures and order/transitivity checks remain necessary.
+Run this entrypoint with the actual Ithon frontend. Its FP source pin is
+`85953de90fecdc6caa8c0b50a3900390cf2c1e20`, the existing shared implementation
+that rendered the Golay rosette film. The shared operation verifies its own
+immutable engine, renderer, Kitchen and independent-verifier pins. It computes
+native frames, replays the native session a second time, compares frames and
+checkpoints, runs independent verification and hostile evidence cases, then
+seals the accepted MP4. The Mathieu result is
+`OUTPUT_ROOT/mathieu/movie.mp4`.
 
-## Host usage (only after a genuine replay renderer exists)
+No exporter, renderer or encoder is copied from Flexible Pipes. This pinned
+operation runs its configured four-example qualification set, including
+Mathieu. Its original legacy FP controller remains explicitly inherited
+runtime debt; new maintained code in this directory is checked Ithon.
+The Ithon implementation's foreign host/runtime files are also a separate
+upstream substrate, not permission to generate consumer Python.
 
-1. Replay the saved interaction at fixed logical frame times, producing
-   `frames/frame_000000.png`, `frames/frame_000001.png`, etc.
-   Do not skip logical frames because rendering is slow. Retain the original
-   frame sequence and session as editable/provenance assets.
-2. Use an **explicit pinned checkout** of `isomorphisms/kitchen`.
-   The CI fixture checks out commit
-   `739faa3068983531a04db33b3ecc43573272368e`.
-3. Invoke the Mathieu-specific consistency checks and the shared encoder:
+The operation controls visibility at the application's rendering boundary.
+The authored motion plan remains distinct from the mathematical event track;
+camera/layout interpolation cannot silently change the exact permutation.
+Offline frames do not establish physical Android behavior.
 
-       KITCHEN_ROOT=/path/to/verified/kitchen \
-         python3 -m capture.export session.json frames mathieu.mp4
+## Compatibility manifest
 
-The wrapper checks event ordering, permutation bijections/composition, frame
-numbering/sizes/checksums, then calls Kitchen's **unchanged** `build.sh`
-with the still-image pattern, FPS, and a private temporary output. It uses
-ffprobe to check decoded frame count, codec, FPS, dimensions and duration,
-then atomically publishes the MP4. It never constructs its own FFmpeg command.
+`capture/export.pi` preserves the earlier `mathieu.capture.v1` interface for
+existing PNG recordings. It takes absolute session, frame-directory and MP4
+paths through the Ithon frontend, with `KITCHEN_ROOT` naming the exact Kitchen
+checkout `739faa3068983531a04db33b3ecc43573272368e`.
 
-Kitchen's ordinary preset is H.264, yuv420p, CRF 18, faststart. Keep
-1080p/60fps as the quality target where the frame renderer supports it;
-4K or device-local encoding requires actual performance and correctness
-qualification. No claim of A1/C67 video export is made.
+The compatibility JSON manifest retains source revision, dimensions, FPS,
+frame hashes, ordered events, generator image lists, word and final mapping.
+It checks bijections and composition, not group membership. The real
+mathematical route above obtains membership/state evidence from the existing
+native engine and independent shared verifier instead of trusting a group name.
 
-## Tests
+Every PNG must have the declared header, dimensions and checksum. Strict
+source decoding and an independent decoded-frame count reject compressed
+image corruption that FFmpeg's ordinary recovery could otherwise conceal.
+Only then does the wrapper invoke Kitchen's unchanged movie builder. It
+verifies the resulting codec, size, FPS, duration and decoded frame count,
+then atomically replaces the public output. Failures preserve prior output.
 
-With FFmpeg/ffprobe and a pinned Kitchen checkout:
+## Verification and source language
 
-    KITCHEN_ROOT=/path/to/verified/kitchen \
-      python3 -m unittest discover -s capture/tests -v
+All maintained capture programs, packages and tests use `.pi`, typed bindings
+and the actual Ithon frontend at
+`74ab6d6044b07b76a910978437a34a6b5ac6acda`. Set
+`ITHON_CHECK_RECEIPT` to retain checked-source hashes. The test requires a
+receipt for the actual imported exporter bytes, not merely the test file.
+The workflow pins both Ithon and Kitchen and checks out the explicit PR head.
 
-The fixture includes a **synthetic** four-frame PNG sequence and the
-identity permutation, so passing it verifies the media integration and
-failure behavior **but not** the real Mathieu interaction. Physical-device
-runtime capture is a separate evidence source: an offline replayed movie
-must never be labeled proof that the Android app displayed those frames.
+`capture/tests/test_export.pi` exercises 16 cases with the real Kitchen
+encoder and complete output decoding. No media test silently skips a missing
+dependency. Cases include invalid permutations, Boolean points/frames,
+event order, missing/extra/corrupt/reordered frames, compressed-image damage,
+source identity, missing/wrong Kitchen and preservation of previous output.
+`capture/tests/test_shared.pi` checks source and interrupted-output refusals.
+Actual shared production is separate evidence from these preflight tests.
 
-## Remaining work
-
-- Actual interactive mathematics, validated Mathieu generators, and a
-  durable user-event log with interruption recovery.
-- Deterministic replay into the native renderer / offscreen framebuffer,
-  retaining actual interaction timing, labels, choices and camera movement.
-- Finish → Preview → Export UI and separate optional raw-runtime capture.
-- Real end-to-end video + mathematical AI-CI acceptance, with device proof
-  where applicable. See
-  [MATHIEU-CAPTURE-01](https://github.com/isomorphisms/flexible-pipes/issues/243).
-
-Do **not** start the deferred cross-repository framebuffer-motion campaign
-as an accidental prerequisite for this narrow reuse correction.
+This is a command-line offline capture path. Application export/share controls,
+on-device recording/cancellation, physical-device updates, and the exact
+Griess book operations remain distinct work under the existing assignments.
