@@ -1,0 +1,247 @@
+"""Checked Ithon input validation; Kitchen alone assembles the movie.
+
+The compatibility manifest checks consistency, not Mathieu membership.
+Real mathematical production/acceptance belongs to shared WIGGLE.
+"""
+import argparse
+import hashlib
+import json
+import os
+import re
+import struct
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+from fractions import Fraction
+from builtins import dict, list, isinstance, sorted, abs, ValueError, FileNotFoundError, OSError
+
+class CaptureError(ValueError):
+    pass
+
+def positive_integer(value ∈ object, field ∈ str) → int:
+    if not isinstance(value,int) or isinstance(value,bool) or int(value) < 1:
+        raise CaptureError(field + ' must be a positive integer')
+    return int(value)
+
+def permutation(value ∈ object, degree ∈ int, field ∈ str) → list[int]:
+    if not isinstance(value,list):
+        raise CaptureError(field + ' must be a permutation')
+    candidates ∈ list[object] ← list(value)
+    if len(candidates) != degree:
+        raise CaptureError(field + ' has the wrong degree')
+    result ∈ list[int] ← []
+    for point in candidates:
+        if not isinstance(point,int) or isinstance(point,bool):
+            raise CaptureError(field + ' is not an integer bijection')
+        result.append(int(point))
+    ordered ∈ list[int] ← sorted(result)
+    identity ∈ list[int] ← list(range(degree))
+    if ordered != identity:
+        raise CaptureError(field + ' is not a bijection')
+    return result
+
+def validate_math(value ∈ object) → None:
+    if not isinstance(value,dict):
+        raise CaptureError('math must contain exact action data')
+    math ∈ dict[str,object] ← dict(value)
+    degrees ∈ dict[str,int] ← {'M11':11,'M12':12,'M22':22,'M23':23,'M24':24}
+    group ∈ str ← str(math.get('group',''))
+    if not bool(degrees.__contains__(group)):
+        raise CaptureError('unsupported group name')
+    degree ∈ int ← degrees[group]
+    raw_generators ∈ object ← math.get('generators')
+    raw_word ∈ object ← math.get('word')
+    if not isinstance(raw_generators,dict) or not isinstance(raw_word,list):
+        raise CaptureError('generators and word must be present')
+    generators ∈ dict[str,object] ← dict(raw_generators)
+    word ∈ list[object] ← list(raw_word)
+    if len(generators) == 0 or len(word) == 0:
+        raise CaptureError('generators and word must be nonempty')
+    admitted ∈ dict[str,list[int]] ← {}
+    for name in generators:
+        if not isinstance(name,str) or len(str(name)) == 0:
+            raise CaptureError('generator name must be nonempty text')
+        admitted[str(name)] ← permutation(generators[name],degree,'generator ' + str(name))
+    result ∈ list[int] ← list(range(degree))
+    for item in word:
+        if not isinstance(item,str) or not bool(admitted.__contains__(str(item))):
+            raise CaptureError('unknown generator in word')
+        mapping ∈ list[int] ← admitted[str(item)]
+        following ∈ list[int] ← []
+        for point in result:
+            following.append(mapping[point])
+        result ← following
+    if result != permutation(math.get('final_mapping'),degree,'math.final_mapping'):
+        raise CaptureError('math.final_mapping differs from recorded word')
+
+def validate_manifest(value ∈ object) → tuple[int,int,int,list[str]]:
+    if not isinstance(value,dict):
+        raise CaptureError('expected format mathieu.capture.v1')
+    manifest ∈ dict[str,object] ← dict(value)
+    if str(manifest.get('format')) != 'mathieu.capture.v1':
+        raise CaptureError('expected format mathieu.capture.v1')
+    width ∈ int ← positive_integer(manifest.get('width'),'width')
+    height ∈ int ← positive_integer(manifest.get('height'),'height')
+    fps ∈ int ← positive_integer(manifest.get('fps'),'fps')
+    if width % 2 or height % 2 or width > 7680 or height > 4320:
+        raise CaptureError('invalid yuv420p dimensions')
+    if not bool([24,30,60].__contains__(fps)):
+        raise CaptureError('fps must be 24, 30, or 60')
+    if not isinstance(manifest.get('source_revision'),str) or not bool(re.fullmatch('[0-9a-f]{40}',str(manifest.get('source_revision')))):
+        raise CaptureError('invalid source_revision')
+    raw_hashes ∈ object ← manifest.get('frame_sha256')
+    if not isinstance(raw_hashes,list):
+        raise CaptureError('frame_sha256 must be a list')
+    hashes ∈ list[str] ← []
+    candidates ∈ list[object] ← list(raw_hashes)
+    for digest in candidates:
+        if not isinstance(digest,str) or not bool(re.fullmatch('[0-9a-f]{64}',str(digest))):
+            raise CaptureError('invalid frame checksum')
+        hashes.append(str(digest))
+    if len(hashes) < 1 or len(hashes) > 999999:
+        raise CaptureError('invalid number of frames')
+    raw_events ∈ object ← manifest.get('events')
+    if not isinstance(raw_events,list) or len(list(raw_events)) == 0:
+        raise CaptureError('events must contain the original interaction')
+    previous ∈ int ← -1
+    events ∈ list[object] ← list(raw_events)
+    for item in events:
+        if not isinstance(item,dict):
+            raise CaptureError('invalid event record')
+        event ∈ dict[str,object] ← dict(item)
+        if not isinstance(event.get('frame'),int) or isinstance(event.get('frame'),bool):
+            raise CaptureError('event frame must be an integer')
+        frame ∈ int ← int(event.get('frame'))
+        if frame < previous or frame < 0 or frame >= len(hashes):
+            raise CaptureError('interaction events must be ordered and within recording')
+        if not isinstance(event.get('kind'),str) or len(str(event.get('kind'))) == 0:
+            raise CaptureError('event kind must be nonempty text')
+        previous ← frame
+    validate_math(manifest.get('math'))
+    return (width,height,fps,hashes)
+
+def verify_frames(directory ∈ object, width ∈ int, height ∈ int, hashes ∈ list[str]) → None:
+    if not bool(directory.is_dir()):
+        raise CaptureError('frame directory not found')
+    expected ∈ list[str] ← []
+    for index in range(len(hashes)):
+        expected.append('frame_{:06d}.png'.format(index))
+    actual ∈ list[str] ← []
+    paths ∈ list[object] ← list(directory.glob('frame_*.png'))
+    for path in paths:
+        actual.append(str(path.name))
+    ordered ∈ list[str] ← sorted(actual)
+    if ordered != expected:
+        raise CaptureError('nonconsecutive frames')
+    for index in range(len(hashes)):
+        path ∈ object ← directory.joinpath(expected[index])
+        if bool(path.is_symlink()) or not bool(path.is_file()):
+            raise CaptureError('frame is not a regular file')
+        header ∈ bytes ← b''
+        with path.open('rb') as stream:
+            header ← stream.read(24)
+        if len(header) != 24 or header[:8] != b'\x89PNG\r\n\x1a\n' or header[12:16] != b'IHDR':
+            raise CaptureError('invalid PNG header')
+        dimensions ∈ tuple[int,int] ← struct.unpack('>II',header[16:24])
+        if dimensions != (width,height):
+            raise CaptureError('wrong PNG size')
+        digest ∈ object ← hashlib.sha256()
+        with path.open('rb') as stream:
+            block ∈ bytes ← stream.read(1048576)
+            while len(block) > 0:
+                digest.update(block)
+                block ← stream.read(1048576)
+        if str(digest.hexdigest()) != hashes[index]:
+            raise CaptureError('frame checksum mismatch')
+
+def command(arguments ∈ list[str]) → str:
+    try:
+        return str(subprocess.run(arguments,check=True,capture_output=True,text=True).stdout)
+    except FileNotFoundError as error:
+        raise CaptureError('required command missing: ' + arguments[0]) from error
+    except subprocess.CalledProcessError as error:
+        raise CaptureError('command failed: ' + str(error.stderr)[-3000:]) from error
+
+def verify_video(path ∈ object, width ∈ int, height ∈ int, fps ∈ int, count ∈ int) → None:
+    output ∈ str ← command(['ffprobe','-v','error','-select_streams','v:0','-count_frames','-show_entries','stream=codec_name,width,height,pix_fmt,avg_frame_rate,nb_read_frames','-show_entries','format=duration','-of','json',str(path)])
+    details ∈ dict[str,object] ← dict(json.loads(output))
+    empty ∈ list[object] ← []
+    streams ∈ list[object] ← list(details.get('streams',empty))
+    if len(streams) != 1:
+        raise CaptureError('export needs exactly one video stream')
+    stream ∈ dict[str,object] ← dict(streams[0])
+    rate ∈ object ← Fraction(str(stream.get('avg_frame_rate','0')))
+    if str(stream.get('codec_name')) != 'h264' or str(stream.get('pix_fmt')) != 'yuv420p' or int(stream.get('width',0)) != width or int(stream.get('height',0)) != height or not bool(rate.__eq__(fps)) or str(stream.get('nb_read_frames')) != str(count):
+        raise CaptureError('video metadata or frame count differs')
+    empty_format ∈ dict[str,object] ← {}
+    format ∈ dict[str,object] ← dict(details.get('format',empty_format))
+    duration ∈ float ← float(format.get('duration',0))
+    difference ∈ float ← abs(duration - count / fps)
+    if difference > 1 / fps / 10:
+        raise CaptureError('video duration differs')
+
+def export(session_path ∈ object, frames_dir ∈ object, output ∈ object) → object:
+    manifest ∈ object ← json.loads(session_path.read_text(encoding='utf-8'))
+    dimensions ∈ tuple[int,int,int,list[str]] ← validate_manifest(manifest)
+    width ∈ int ← dimensions[0]
+    height ∈ int ← dimensions[1]
+    fps ∈ int ← dimensions[2]
+    hashes ∈ list[str] ← dimensions[3]
+    verify_frames(frames_dir,width,height,hashes)
+    extension ∈ str ← str(output.suffix).lower()
+    if extension != '.mp4':
+        raise CaptureError('output must end in .mp4')
+    kitchen_root ∈ str ← str(os.environ.get('KITCHEN_ROOT',''))
+    expected_revision ∈ str ← '739faa3068983531a04db33b3ecc43573272368e'
+    if len(kitchen_root) == 0:
+        raise CaptureError('KITCHEN_ROOT must name the pinned Kitchen checkout')
+    observed_revision ∈ str ← command(['git','-C',kitchen_root,'rev-parse','HEAD']).strip()
+    if observed_revision != expected_revision:
+        raise CaptureError('Kitchen revision differs from pin')
+    command(['git','-C',kitchen_root,'diff','--exit-code','HEAD','--','tasks/movie-from-stills'])
+    builder ∈ object ← Path(kitchen_root).joinpath('tasks/movie-from-stills/build.sh')
+    if not bool(builder.is_file()):
+        raise CaptureError('canonical Kitchen builder missing')
+    # Decode the entire source sequence strictly. FFmpeg's default recovery
+    # can otherwise conceal a corrupt image through a repeated output frame.
+    # This discards decoded frames; Kitchen still owns the only movie encoder.
+    decoding ∈ object ← subprocess.run(['ffmpeg','-nostdin','-loglevel','error','-xerror','-err_detect','explode','-framerate',str(fps),'-start_number','0','-i',str(frames_dir.joinpath('frame_%06d.png')),'-frames:v',str(len(hashes)),'-f','null','-'],capture_output=True,text=True)
+    if int(decoding.returncode) != 0 or len(str(decoding.stderr)) != 0:
+        raise CaptureError('source frame decoding failed')
+    frame_details ∈ dict[str,object] ← dict(json.loads(command(['ffprobe','-v','error','-count_frames','-show_entries','stream=nb_read_frames','-of','json',str(frames_dir.joinpath('frame_%06d.png'))])))
+    empty_streams ∈ list[object] ← []
+    source_streams ∈ list[object] ← list(frame_details.get('streams',empty_streams))
+    if len(source_streams) != 1:
+        raise CaptureError('source frame decoding failed')
+    source_stream ∈ dict[str,object] ← dict(source_streams[0])
+    if str(source_stream.get('nb_read_frames','0')) != str(len(hashes)):
+        raise CaptureError('source frame decoding failed: missing decoded images')
+    output.parent.mkdir(parents=True,exist_ok=True)
+    pending ∈ object ← None
+    with tempfile.NamedTemporaryFile(prefix='.mathieu-export-',suffix='.mp4',dir=output.parent,delete=False) as temporary:
+        pending ← Path(temporary.name)
+    try:
+        command(['/bin/sh',str(builder),str(frames_dir.joinpath('frame_%06d.png')),str(fps),str(pending)])
+        verify_video(pending,width,height,fps,len(hashes))
+        os.replace(pending,output)
+    finally:
+        pending.unlink(missing_ok=True)
+    return output
+
+def main() → int:
+    parser ∈ object ← argparse.ArgumentParser(description='Validate Mathieu replay inputs and invoke pinned Kitchen')
+    parser.add_argument('session',type=Path)
+    parser.add_argument('frames',type=Path)
+    parser.add_argument('output',type=Path)
+    arguments ∈ object ← parser.parse_args()
+    try:
+        result ∈ object ← export(arguments.session,arguments.frames,arguments.output)
+        print('Verified video: ' + str(result))
+        return 0
+    except (ValueError,OSError) as error:
+        print('Mathieu capture export failed: ' + str(error),file=sys.stderr)
+        return 1
+
+if __name__ == '__main__':
+    sys.exit(main())
