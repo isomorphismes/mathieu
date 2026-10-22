@@ -1,0 +1,33 @@
+"""Fail closed before shared generation for wrong sources or reused output."""
+import sys
+import tempfile
+from pathlib import Path
+from builtins import list, ValueError
+sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
+from shared import generate
+
+def main() → None:
+    source ∈ object ← Path(__file__).resolve().parent.parent.parent
+    with tempfile.TemporaryDirectory() as temporary:
+        root ∈ object ← Path(temporary)
+        context ∈ object ← root.joinpath('context.tsv')
+        context.write_text('grease\t/missing/runtime\n')
+        output ∈ object ← root.joinpath('output')
+        rejected ∈ bool ← False
+        try:
+            generate(source,context,root,output)
+        except ValueError:
+            rejected ← True
+        if not rejected or bool(output.exists()):
+            raise ValueError('wrong FP source caused generation')
+        output.mkdir()
+        rejected ← False
+        try:
+            generate(source,context,root,output)
+        except ValueError:
+            rejected ← True
+        if not rejected:
+            raise ValueError('previous output was accepted')
+        print('PASS wrong shared source and previous-output refusals; actual production tested separately')
+
+main()

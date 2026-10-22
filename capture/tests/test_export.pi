@@ -1,0 +1,168 @@
+"""Checked Ithon compatibility tests; synthetic media is not group acceptance."""
+import hashlib
+import json
+import os
+import shutil
+import struct
+import subprocess
+import sys
+import tempfile
+import zlib
+from pathlib import Path
+from builtins import dict, list, bytes, reversed, ValueError
+
+sys.path.insert(0,str(Path(__file__).resolve().parent.parent))
+from export import CaptureError, export, validate_manifest
+
+def require(condition ∈ bool, message ∈ str) → None:
+    if not condition:
+        raise ValueError(message)
+
+def chunk(kind ∈ bytes, payload ∈ bytes) → bytes:
+    data ∈ bytes ← kind + payload
+    count ∈ bytes ← struct.pack('>I',len(payload))
+    checksum ∈ int ← zlib.crc32(data)
+    trailer ∈ bytes ← struct.pack('>I',checksum & 0xffffffff)
+    return count + data + trailer
+
+def png(width ∈ int, height ∈ int, rgb ∈ tuple[int,int,int]) → bytes:
+    raw ∈ bytes ← b''
+    color ∈ bytes ← bytes(rgb)
+    scanline ∈ bytes ← b'\x00'
+    for column in range(width):
+        scanline ← scanline + color
+    for row in range(height):
+        raw ← raw + scanline
+    dimensions ∈ bytes ← struct.pack('>IIBBBBB',width,height,8,2,0,0,0)
+    compressed ∈ bytes ← zlib.compress(raw)
+    return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR',dimensions) + chunk(b'IDAT',compressed) + chunk(b'IEND',b'')
+
+def fixture(root ∈ object) → tuple[object,object,dict[str,object]]:
+    frames ∈ object ← root.joinpath('frames')
+    frames.mkdir()
+    identity ∈ list[int] ← list(range(11))
+    hashes ∈ list[str] ← []
+    colors ∈ list[tuple[int,int,int]] ← [(230,15,5),(230,15,5),(5,25,225),(5,25,225)]
+    for index in range(4):
+        data ∈ bytes ← png(64,48,colors[index])
+        frames.joinpath('frame_{:06d}.png'.format(index)).write_bytes(data)
+        hashes.append(str(hashlib.sha256(data).hexdigest()))
+    manifest ∈ dict[str,object] ← {'format':'mathieu.capture.v1','width':64,'height':48,'fps':60,'source_revision':'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','frame_sha256':hashes,'events':[{'frame':0,'kind':'touch_down'},{'frame':2,'kind':'touch_move'},{'frame':3,'kind':'touch_up'}],'math':{'group':'M11','generators':{'identity':identity},'word':['identity'],'final_mapping':identity}}
+    session ∈ object ← root.joinpath('session.json')
+    session.write_text(json.dumps(manifest),encoding='utf-8')
+    return (session,frames,manifest)
+
+def run_case(name ∈ str) → None:
+    with tempfile.TemporaryDirectory() as temporary:
+        root ∈ object ← Path(temporary)
+        values ∈ tuple[object,object,dict[str,object]] ← fixture(root)
+        session ∈ object ← values[0]
+        frames ∈ object ← values[1]
+        manifest ∈ dict[str,object] ← values[2]
+        output ∈ object ← root.joinpath('out.mp4')
+        output.write_bytes(b'old accepted movie')
+        expected ∈ str ← ''
+        kitchen ∈ str ← str(os.environ.get('KITCHEN_ROOT',''))
+        math ∈ dict[str,object] ← dict(manifest['math'])
+        hashes ∈ list[str] ← list(manifest['frame_sha256'])
+        if name == 'mapping':
+            math['final_mapping'] ← list(reversed(range(11)))
+            expected ← 'differs'
+        elif name == 'bijection':
+            math['generators'] ← {'identity':[1,1,2,3,4,5,6,7,8,9,10]}
+            expected ← 'bijection'
+        elif name == 'boolean_point':
+            math['generators'] ← {'identity':[False,1,2,3,4,5,6,7,8,9,10]}
+            expected ← 'integer'
+        elif name == 'events':
+            manifest['events'] ← [{'frame':3,'kind':'touch'},{'frame':2,'kind':'touch'}]
+            expected ← 'ordered'
+        elif name == 'boolean_frame':
+            manifest['events'] ← [{'frame':True,'kind':'touch'}]
+            expected ← 'integer'
+        elif name == 'missing':
+            frames.joinpath('frame_000002.png').unlink()
+            expected ← 'nonconsecutive'
+        elif name == 'extra':
+            frames.joinpath('frame_000004.png').write_bytes(png(64,48,(0,0,0)))
+            expected ← 'nonconsecutive'
+        elif name == 'corrupt':
+            frames.joinpath('frame_000001.png').write_bytes(b'broken')
+            expected ← 'PNG header'
+        elif name == 'checksum':
+            frames.joinpath('frame_000001.png').write_bytes(png(64,48,(1,1,1)))
+            expected ← 'checksum'
+        elif name == 'size':
+            data ∈ bytes ← png(128,48,(0,0,0))
+            frames.joinpath('frame_000001.png').write_bytes(data)
+            hashes[1] ← str(hashlib.sha256(data).hexdigest())
+            expected ← 'wrong PNG size'
+        elif name == 'reordered':
+            hashes[0] ← hashes[2]
+            expected ← 'checksum'
+        elif name == 'decode_failure':
+            # A valid header/hash with corrupt compressed content reaches the
+            # real Kitchen/FFmpeg failure, preserving the prior public output.
+            data ∈ bytes ← png(64,48,(1,1,1))[:33]
+            frames.joinpath('frame_000001.png').write_bytes(data)
+            hashes[1] ← str(hashlib.sha256(data).hexdigest())
+            expected ← 'decoding failed'
+        elif name == 'missing_kitchen':
+            os.environ.__setitem__('KITCHEN_ROOT','')
+            expected ← 'KITCHEN_ROOT'
+        elif name == 'wrong_kitchen':
+            os.environ.__setitem__('KITCHEN_ROOT',str(Path(__file__).resolve().parent.parent.parent))
+            expected ← 'Kitchen revision'
+        elif name == 'source':
+            manifest['source_revision'] ← 'moving-main'
+            expected ← 'source_revision'
+        elif name != 'movie':
+            raise ValueError('unknown test')
+        manifest['math'] ← math
+        manifest['frame_sha256'] ← hashes
+        session.write_text(json.dumps(manifest),encoding='utf-8')
+        rejected ∈ bool ← False
+        try:
+            export(session,frames,output)
+        except CaptureError as error:
+            rejected ← True
+            require(bool(str(error).__contains__(expected)),'wrong rejection for ' + name + ': ' + str(error))
+        finally:
+            os.environ.__setitem__('KITCHEN_ROOT',kitchen)
+        if len(expected) > 0:
+            require(rejected,'accepted bad ' + name)
+            retained ∈ bytes ← output.read_bytes()
+            require(retained == b'old accepted movie','replaced public output after ' + name)
+        else:
+            require(not rejected,'good movie rejected')
+            decoded ∈ bytes ← subprocess.run(['ffmpeg','-nostdin','-loglevel','error','-i',str(output),'-f','rawvideo','-pix_fmt','rgb24','-'],check=True,capture_output=True).stdout
+            frame_bytes ∈ int ← 64 * 48 * 3
+            require(len(decoded) == frame_bytes * 4,'decoded frame count differs')
+            require(decoded[frame_bytes // 2] > decoded[frame_bytes // 2 + 2] + 80,'first frame is not red')
+            require(decoded[3 * frame_bytes + frame_bytes // 2 + 2] > decoded[3 * frame_bytes + frame_bytes // 2] + 80,'last frame is not blue')
+        print('PASS ' + name)
+
+def checked_import_receipt() → None:
+    filename ∈ str ← str(os.environ.get('ITHON_CHECK_RECEIPT',''))
+    require(len(filename) > 0,'checked-source receipt is required')
+    expected ∈ object ← Path(__file__).resolve().parent.parent.joinpath('export.pi')
+    digest ∈ str ← str(hashlib.sha256(expected.read_bytes()).hexdigest())
+    found ∈ bool ← False
+    lines ∈ list[str] ← Path(filename).read_text().splitlines()
+    for line in lines:
+        record ∈ dict[str,object] ← dict(json.loads(line))
+        if str(record.get('filename','')) == str(expected) and str(record.get('source_sha256','')) == digest:
+            found ← True
+    require(found,'Ithon did not check the imported exporter bytes')
+    print('PASS checked imported Ithon source receipt')
+
+def main() → None:
+    require(bool(shutil.which('ffmpeg')) and bool(shutil.which('ffprobe')),'FFmpeg and ffprobe are required; no skipped media tests')
+    require(len(str(os.environ.get('KITCHEN_ROOT',''))) > 0,'pinned Kitchen is required')
+    cases ∈ list[str] ← ['mapping','bijection','boolean_point','events','boolean_frame','missing','extra','corrupt','checksum','size','reordered','decode_failure','source','missing_kitchen','wrong_kitchen','movie']
+    for name in cases:
+        run_case(name)
+    checked_import_receipt()
+    print('PASS 16 capture cases and imported-module checking; no physical-device claim')
+
+main()

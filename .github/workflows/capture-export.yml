@@ -1,0 +1,63 @@
+name: Checked Ithon capture verification
+
+on:
+  push:
+    paths:
+      - 'capture/**'
+      - 'AGENTS.md'
+      - '.github/workflows/capture-export.yml'
+  pull_request:
+    paths:
+      - 'capture/**'
+      - 'AGENTS.md'
+      - '.github/workflows/capture-export.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact source head
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Check out canonical Kitchen movie builder
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          repository: isomorphisms/kitchen
+          ref: 739faa3068983531a04db33b3ecc43573272368e
+          path: .kitchen
+          sparse-checkout: tasks/movie-from-stills
+          persist-credentials: false
+      - name: Check out qualified Ithon frontend
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          repository: dilapidated-shed/ithon
+          ref: 74ab6d6044b07b76a910978437a34a6b5ac6acda
+          path: .ithon
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /ithon
+            /ithon_host.py
+            /Lib/ithon_frontend.py
+            /Lib/ithon_static.py
+            /Lib/ithon_run.py
+          persist-credentials: false
+      - name: Update media dependency packages
+        run: sudo apt-get update
+      - name: Install media decoder and canonical encoder dependency
+        run: sudo apt-get install -y ffmpeg
+      - name: Exercise checked Ithon, real Kitchen output and corrupt-input refusals
+        env:
+          KITCHEN_ROOT: ${{ github.workspace }}/.kitchen
+          ITHON_CHECK_RECEIPT: ${{ runner.temp }}/mathieu-capture-ithon.jsonl
+        run: ./.ithon/ithon capture/tests/test_export.pi
+      - name: Check shared-route preflight and checked imports
+        env:
+          ITHON_CHECK_RECEIPT: ${{ runner.temp }}/mathieu-shared-ithon.jsonl
+        run: ./.ithon/ithon capture/tests/test_shared.pi
