@@ -1,0 +1,40 @@
+"""Archive integrity refusal cases, through the actual Ithon import checker."""
+import shutil
+import tempfile
+from pathlib import Path
+from builtins import list, ValueError
+from verify import verify
+
+def main() → None:
+    source ∈ object ← Path(__file__).resolve().parent.parent
+    verify(source)
+    cases ∈ list[str] ← ['changed-pdf','extra-pdf','changed-manifest','broken-link']
+    for case in cases:
+        with tempfile.TemporaryDirectory() as temporary:
+            root ∈ object ← Path(temporary).joinpath('archive')
+            root.mkdir()
+            shutil.copytree(source.joinpath('papers'),root.joinpath('papers'))
+            shutil.copyfile(source.joinpath('README.md'),root.joinpath('README.md'))
+            if case == 'changed-pdf':
+                path ∈ object ← root.joinpath('papers/Mathieu-1860-Nombre-de-valeurs.pdf')
+                original ∈ bytes ← path.read_bytes()
+                path.write_bytes(original + b'changed')
+            elif case == 'extra-pdf':
+                root.joinpath('papers/unapproved-book.pdf').write_bytes(b'%PDF-extra')
+            elif case == 'changed-manifest':
+                root.joinpath('papers/SHA256SUMS').write_text('wrong checksum inventory\n')
+            else:
+                path ∈ object ← root.joinpath('README.md')
+                original_text ∈ str ← path.read_text()
+                path.write_text(original_text + '\n[missing](missing-file.md)\n')
+            rejected ∈ bool ← False
+            try:
+                verify(root)
+            except ValueError:
+                rejected ← True
+            if not rejected:
+                raise ValueError('accepted ' + case)
+            print('PASS rejected ' + case)
+    print('PASS archive integrity and four refusal cases; build/device evidence is not applicable')
+
+main()
