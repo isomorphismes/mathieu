@@ -9,7 +9,7 @@ var sdk = ARGV[2]
 var stages = ARGV[3]
 setglobal ENV.ANDROID_GREASE = ENV.GREASE
 var source = $(git -C "$root" rev-parse HEAD)
-test "$(git -C "$root/.charcoal" rev-parse HEAD)" = 3e682fb1175beef5625dbd2418730220e49fc9bd
+test "$(git -C "$root/.charcoal" rev-parse HEAD)" = e8b67dfc67776c2b8da919785d15f38d68c91db0
 printf '%s  %s\n' 00ecef16e04031009904028d6c1e411110bfcc2fb8486223a7835259567a3df7 "$root/android/signing/mathieu-development.p12" | sha256sum -c -
 cp -R "$root/.charcoal/native/presentation/res/." "$root/android/res/"
 mkdir -p "$root/build"
@@ -37,4 +37,4 @@ for abi in armeabi-v7a arm64-v8a x86_64 {
     "$root/build/mathieu-$abi.apk"
   sha256sum "$root/build/mathieu-$abi.apk" >> "$root/build/charcoal-apks.sha256"
 }
-printf 'source\t%s\nshared_palette\t3e682fb1175beef5625dbd2418730220e49fc9bd\napplication_C\tqualified_ICK\nNDK_boundary\tforeign_glue_assembly_link\nversion_code\t2\nphysical_C67\tNOT_RUN\n' "$source" > "$root/build/charcoal-producer.tsv"
+printf 'source\t%s\nshared_palette\te8b67dfc67776c2b8da919785d15f38d68c91db0\napplication_C\tqualified_ICK\nNDK_boundary\tforeign_glue_assembly_link\nversion_code\t2\nphysical_C67\tNOT_RUN\n' "$source" > "$root/build/charcoal-producer.tsv"
