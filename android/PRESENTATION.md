@@ -1,5 +1,13 @@
 # Small Tarot markers
 
+The current native application defaults to the shared charcoal palette. Its
+background is `#212121`; controls and ordinary text use the shared roles.
+Swords use warm light `#B9ACA9` so the existing dark suit remains distinguishable
+on charcoal. All suit faces use dark glyph ink, preserving legibility and marker
+identity. Other suit colors, forms, coordinates and transport are unchanged.
+See [charcoal presentation](../_/charcoal/README.md) for current sources and
+acceptance boundaries. The earlier paper palette below records its provenance.
+
 The 2026-10-21 presentation revision uses Moonrise Kingdom's `Moonrise2`
 palette, listed in [karthik/wesanderson](https://github.com/karthik/wesanderson/blob/master/R/colors.R):
 ochre `#C27D38`, sage `#798E87`, dark brown `#29211F`, parchment `#CCC591`.

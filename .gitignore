@@ -1,2 +1,8 @@
 /build/
 **/build/
+/.aici-ick/
+/grease/
+/android/res/values/charcoal.xml
+/android/res/values-v21/charcoal.xml
+/android/res/values-v31/charcoal.xml
+/android/res/color/charcoal_text_states.xml

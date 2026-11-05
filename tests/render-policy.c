@@ -18,13 +18,15 @@ int main(int argc,char **argv) {
             mathieu_render_with_options(&state,hidden,WIDTH,HEIGHT,STRIDE,(mathieu_render_options){0});
             CHECK(!memcmp(&state,&before,sizeof state));
             mathieu_render(&state,visible,WIDTH,HEIGHT,STRIDE);
+            CHECK(hidden[0] == 0xff212121u && visible[0] == 0xff212121u);
             mathieu_render_scene(&state,passes,WIDTH,HEIGHT,STRIDE);
             mathieu_render_controls(&state,passes,WIDTH,HEIGHT,STRIDE);
             CHECK(!memcmp(visible,passes,STRIDE * HEIGHT * sizeof *visible));
             CHECK(memcmp(hidden,visible,STRIDE * HEIGHT * sizeof *visible));
-            /* Known controls pixel is paper when the pass is disabled. */
+            /* Independently known controls pixel remains charcoal without UI. */
             CHECK(hidden[60 * STRIDE + 15] == hidden[0]);
             CHECK(visible[60 * STRIDE + 15] != visible[0]);
+            CHECK(visible[60 * STRIDE + 15] == (degree == 12 ? 0xff595959u : 0xff383838u));
             state.error ← 2;
             mathieu_render_with_options(&state,passes,WIDTH,HEIGHT,STRIDE,(mathieu_render_options){0});
             CHECK(!memcmp(hidden,passes,STRIDE * HEIGHT * sizeof *hidden));

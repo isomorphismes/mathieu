@@ -1,0 +1,163 @@
+name: Charcoal native Mathieu acceptance
+on:
+  pull_request:
+    paths:
+      - native/**
+      - android/**
+      - tests/**
+      - .charcoal
+      - .gitmodules
+      - _/charcoal/**
+      - .github/workflows/charcoal.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compilers:
+    uses: Ashtray-Archer/utilities-android-phone-user/.github/workflows/ick-compilers.yml@7dfacda62e5b1a7b8c28925bff437602dab7e14a
+  host:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          submodules: true
+          persist-credentials: false
+      - uses: isomorphisms/ai-ci/ick-host@618223d47315a180851c1539197cdcdb761a4b0d
+        id: ick
+      - name: Execute unchanged mathematical/session tests and actual renderer checks
+        run: make -j2 host-test ICK="${{ steps.ick.outputs.compiler }}"
+      - name: Render the real controls-free rosette for inspection
+        run: build/Debug/render-policy-test build/charcoal-rosette.ppm
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mathieu-charcoal-host-${{ github.event.pull_request.head.sha || github.sha }}
+          path: build/charcoal-rosette.ppm
+          if-no-files-found: error
+  packages:
+    needs: [host, compilers]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      ASAN_OPTIONS: detect_leaks=0
+      GREASE: ${{ github.workspace }}/grease/bin/grease
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          submodules: true
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: isomorphisms/ai-ci
+          ref: 4ea071a96239f3a29ca6d98454feb59947d87cfe
+          path: .aici-ick
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.2.12479018'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: ick-*
+          path: build/ick-packages
+          merge-multiple: true
+      - run: make -f .aici-ick/ick-android/Makefile restore-stage ABI=armeabi-v7a ICK_STAGE="$GITHUB_WORKSPACE/build/ick/armeabi-v7a" ICK_ARCHIVE="$GITHUB_WORKSPACE/build/ick-packages/ick-armeabi-v7a.tar.gz"
+      - run: make -f .aici-ick/ick-android/Makefile restore-stage ABI=arm64-v8a ICK_STAGE="$GITHUB_WORKSPACE/build/ick/arm64-v8a" ICK_ARCHIVE="$GITHUB_WORKSPACE/build/ick-packages/ick-arm64-v8a.tar.gz"
+      - run: make -f .aici-ick/ick-android/Makefile restore-stage ABI=x86_64 ICK_STAGE="$GITHUB_WORKSPACE/build/ick/x86_64" ICK_ARCHIVE="$GITHUB_WORKSPACE/build/ick-packages/ick-x86_64.tar.gz"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          repository: dilapidated-shed/grease
+          run-id: 41253994123
+          artifact-ids: 13062637698
+          merge-multiple: true
+          github-token: ${{ github.token }}
+          path: grease
+      - uses: isomorphisms/ai-ci/.github/actions/charcoal-grease@ebfb667b64009f0c0bdf9dcfafb7884196786ef5
+      - run: sudo sysctl vm.mmap_rnd_bits=28
+      - name: Compile literal Icky C and package with the unchanged development signer
+        run: >
+          "$GREASE" _/charcoal/package.grease "$GITHUB_WORKSPACE"
+          "$ANDROID_HOME/ndk/27.2.12479018" "$ANDROID_HOME" "$GITHUB_WORKSPACE/build/ick"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mathieu-charcoal-apks-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            build/mathieu-*.apk
+            build/mathieu-*.receipt.tsv
+            build/charcoal-apks.sha256
+            build/charcoal-producer.tsv
+          if-no-files-found: error
+  android:
+    needs: packages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - api: 29
+            target: default
+          - api: 34
+            target: google_apis
+    env:
+      ASAN_OPTIONS: detect_leaks=0
+      GREASE: ${{ github.workspace }}/grease/bin/grease
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: isomorphisms/ai-ci
+          ref: ebfb667b64009f0c0bdf9dcfafb7884196786ef5
+          path: .aici
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: mathieu-charcoal-apks-${{ github.event.pull_request.head.sha || github.sha }}
+          path: candidate
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          repository: dilapidated-shed/grease
+          run-id: 41253994123
+          artifact-ids: 13062637698
+          merge-multiple: true
+          github-token: ${{ github.token }}
+          path: grease
+      - uses: isomorphisms/ai-ci/.github/actions/charcoal-grease@ebfb667b64009f0c0bdf9dcfafb7884196786ef5
+      - run: sudo sysctl vm.mmap_rnd_bits=28
+      - run: sudo apt-get update
+      - run: sudo apt-get install --no-install-recommends -y ffmpeg ripgrep
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+        with:
+          packages: 'build-tools;36.0.0 platforms;android-36'
+      - run: sudo chmod 666 /dev/kvm
+      - uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: ${{ matrix.api }}
+          target: ${{ matrix.target }}
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -no-audio -no-snapshot -no-boot-anim -memory 2048 -gpu swiftshader_indirect
+          script: >
+            "$GREASE" _/charcoal/observe.grease "$ANDROID_HOME/platform-tools/adb" "$ANDROID_HOME"
+            "$GITHUB_WORKSPACE/candidate/mathieu-x86_64.apk" "$GREASE" "$GITHUB_WORKSPACE/.aici"
+            "$RUNNER_TEMP/mathieu-charcoal" "${{ matrix.api }}" "${{ github.event.pull_request.head.sha || github.sha }}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: mathieu-charcoal-API${{ matrix.api }}-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mathieu-charcoal
+          if-no-files-found: warn

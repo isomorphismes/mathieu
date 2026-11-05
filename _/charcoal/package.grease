@@ -1,0 +1,39 @@
+#!/usr/bin/env grease
+# Existing canonical APK packager remains the external packaging boundary.
+set -eu -o pipefail
+if (len(ARGV) !== 4) { echo 'requires ROOT NDK SDK ICK_STAGES' >&2; exit 2 }
+var supplied_root = ARGV[0]
+var root = $(realpath "$supplied_root")
+var ndk = ARGV[1]
+var sdk = ARGV[2]
+var stages = ARGV[3]
+var source = $(git -C "$root" rev-parse HEAD)
+test "$(git -C "$root/.charcoal" rev-parse HEAD)" = 3e682fb1175beef5625dbd2418730220e49fc9bd
+printf '%s  %s\n' 00ecef16e04031009904028d6c1e411110bfcc2fb8486223a7835259567a3df7 "$root/android/signing/mathieu-development.p12" | sha256sum -c -
+cp -R "$root/.charcoal/native/presentation/res/." "$root/android/res/"
+mkdir -p "$root/build"
+printf '%s' '' > "$root/build/charcoal-apks.sha256"
+for abi in armeabi-v7a arm64-v8a x86_64 {
+  var target = 'x86_64-linux-gnu'
+  if (abi === 'armeabi-v7a') { setvar target = 'arm-linux-gnueabi' }
+  if (abi === 'arm64-v8a') { setvar target = 'aarch64-linux-gnu' }
+  var compiler = "$stages/$abi/bin/$target-gcc"
+  test -x "$compiler"
+  test "$("$compiler" -dumpmachine)" = "$target"
+  make -f "$root/android/Makefile" library ABI="$abi" PROFILE=Debug \
+    ICK_ANDROID="$compiler" NDK="$ndk" SOURCE_SHA="$source"
+  env ANDROID_HOME="$sdk" ANDROID_BUILD_TOOLS="$sdk/build-tools/36.0.0" \
+    ANDROID_COMPILE_SDK=36 ANDROID_PACKAGE_ID=org.isomorphisms.mathieu \
+    ANDROID_VERSION_CODE=2 ANDROID_VERSION_NAME=0.1.1-development \
+    ANDROID_MIN_SDK=26 ANDROID_TARGET_SDK=35 ANDROID_EXPECTED_LABEL=Mathieu \
+    ANDROID_KEYSTORE="$root/android/signing/mathieu-development.p12" \
+    ANDROID_KEYSTORE_TYPE=PKCS12 ANDROID_KEY_ALIAS=mathieu-development \
+    ANDROID_STORE_PASSWORD=android ANDROID_KEY_PASSWORD=android \
+    ANDROID_EXPECTED_CERT_SHA256=f997a30170a967e073ab47e1212a71b3967ffe2e1e88d78d659c77bf085cb3fe \
+    ANDROID_RES_DIR="$root/android/res" ANDROID_SOURCE_COMMIT="$source" \
+    bash "$root/.charcoal/apk/build-nativeactivity-apk.sh" \
+    "$root/android/AndroidManifest.xml" "$root/build/android/$abi/Debug/libmathieu.so" "$abi" \
+    "$root/build/mathieu-$abi.apk"
+  sha256sum "$root/build/mathieu-$abi.apk" >> "$root/build/charcoal-apks.sha256"
+}
+printf 'source\t%s\nshared_palette\t3e682fb1175beef5625dbd2418730220e49fc9bd\napplication_C\tqualified_ICK\nNDK_boundary\tforeign_glue_assembly_link\nversion_code\t2\nphysical_C67\tNOT_RUN\n' "$source" > "$root/build/charcoal-producer.tsv"
