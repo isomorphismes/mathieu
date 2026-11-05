@@ -1,0 +1,88 @@
+#!/usr/bin/env grease
+set -eu -o pipefail
+if (len(ARGV) !== 8) { echo 'requires ADB SDK APK GREASE AICI NEW_OUTPUT API SOURCE' >&2; exit 2 }
+var adb = ARGV[0]
+var sdk = ARGV[1]
+var apk = ARGV[2]
+var runtime = ARGV[3]
+var aici = ARGV[4]
+var output = ARGV[5]
+var api = ARGV[6]
+var source = ARGV[7]
+var package = 'org.isomorphisms.mathieu'
+var component = "$package/android.app.NativeActivity"
+test ! -e "$output"
+mkdir -p "$output"
+"$adb" shell getprop ro.kernel.qemu | tr -d '\r' | rg -x 1
+test "$("$adb" shell getprop ro.build.version.sdk | tr -d '\r')" = "$api"
+"$adb" shell getprop ro.product.cpu.abi | tr -d '\r' | rg -x x86_64
+"$sdk/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$apk" > "$output/signer.txt"
+rg -x -F 'Signer #1 certificate SHA-256 digest: f997a30170a967e073ab47e1212a71b3967ffe2e1e88d78d659c77bf085cb3fe' "$output/signer.txt"
+"$adb" shell pm list packages "$package" > "$output/namespace-before.txt"
+try { rg -x -F "package:$package" "$output/namespace-before.txt" }
+if (_error.code !== 1) { echo 'FAIL Mathieu visual test requires a fresh namespace' >&2; exit 1 }
+"$adb" install "$apk" > "$output/install.txt"
+"$adb" install -r "$apk" > "$output/replacement.txt"
+"$adb" shell wm size 480x960
+"$adb" shell wm density 160
+for mode in no yes {
+  "$adb" shell cmd uimode night "$mode" > "$output/night-$mode.txt"
+  "$adb" shell am force-stop "$package"
+  "$adb" logcat -c
+  "$adb" shell am start -W -n "$component" > "$output/start-$mode.txt"
+  var ready = false
+  for attempt in @(seq 1 25) {
+    "$adb" logcat -d > "$output/runtime-$mode.txt"
+    try { rg -F "source=$source" "$output/runtime-$mode.txt" | rg -F 'charcoal frame posted width=' }
+    if (_error.code === 0) { setvar ready = true; break }
+    sleep 1
+  }
+  if (not ready) { echo 'FAIL Mathieu did not post a source-bound native frame' >&2; exit 1 }
+  var width = int($(sed -n 's/.*charcoal frame posted width=\([0-9][0-9]*\) height=.*/\1/p' "$output/runtime-$mode.txt" | tail -n 1))
+  var height = int($(sed -n 's/.*charcoal frame posted width=[0-9][0-9]* height=\([0-9][0-9]*\).*/\1/p' "$output/runtime-$mode.txt" | tail -n 1))
+  var numerator = width
+  var denominator = 360
+  var offset_x = 0
+  var offset_y = 0
+  if (height * 360 < width * 720) {
+    setvar numerator = height
+    setvar denominator = 720
+    setvar offset_x = (width - height * 360 // 720) // 2
+  } else { setvar offset_y = (height - width * 720 // 360) // 2 }
+  var first_x = offset_x + 15 * numerator // denominator
+  var second_x = offset_x + 105 * numerator // denominator
+  var sample_y = offset_y + 60 * numerator // denominator
+  "$adb" shell dumpsys activity activities > "$output/activity-$mode.txt"
+  rg '(mResumedActivity|topResumedActivity)' "$output/activity-$mode.txt" | rg -F "$component"
+  "$adb" shell pidof "$package" | tr -d '\r' | rg -x '[1-9][0-9]*'
+  "$adb" exec-out screencap -p > "$output/scene-$mode.png"
+  "$runtime" "$aici/charcoal/check-frame.grease" "$(command -v ffmpeg)" "$output/scene-$mode.png" "$output/scene-$mode.frame.txt"
+  for role in root first second {
+    var sample_x = 2
+    var y = 200
+    var expected = ' *3[1-5] +3[1-5] +3[1-5] *'
+    if (role !== 'root') {
+      setvar y = sample_y
+      setvar expected = ' *5[4-8] +5[4-8] +5[4-8] *'
+      if (role === 'first') { setvar sample_x = first_x } else { setvar sample_x = second_x }
+      var selected = mode === 'no' and role === 'first'
+      if (mode === 'yes' and role === 'second') { setvar selected = true }
+      if (selected) {
+        setvar expected = ' *(8[7-9]|9[0-1]) +(8[7-9]|9[0-1]) +(8[7-9]|9[0-1]) *'
+      }
+    }
+    ffmpeg -nostdin -hide_banner -i "$output/scene-$mode.png" -vf "crop=1:1:$[sample_x]:$[y],format=rgb24" -frames:v 1 -f rawvideo "$output/$role-$mode.rgb" > "$output/$role-$mode.decode.txt" 2>&1
+    od -An -tu1 "$output/$role-$mode.rgb" > "$output/$role-$mode.txt"
+    rg -x "$expected" "$output/$role-$mode.txt"
+  }
+  var tap_x = offset_x + 135 * numerator // denominator
+  var tap_y = offset_y + 70 * numerator // denominator
+  if (mode === 'yes') { setvar tap_x = offset_x + 45 * numerator // denominator; setvar tap_y = offset_y + 120 * numerator // denominator }
+  "$adb" shell input tap "$[tap_x]" "$[tap_y]"
+  sleep 1
+  "$adb" logcat -d > "$output/tap-$mode.txt"
+  rg 'tap .*M24 word=' "$output/tap-$mode.txt"
+}
+"$adb" shell cmd uimode night no > "$output/night-restored.txt"
+sha256sum "$apk" > "$output/apk.sha256"
+printf 'source\t%s\nAPI\t%s\nboth_system_modes\tPASS\nsource_bound_posted_frame\tPASS\nreal_controls_and_root_pixels\tPASS\nframework_tap_and_group_reopening\tPASS\nsame_candidate_replacement\tPASS\nrotation\tNOT_RUN\nstartup_transition_sequence\tNOT_RUN\nphysical_C67\tNOT_RUN\n' "$source" "$api" > "$output/receipt.tsv"

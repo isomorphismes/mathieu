@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.isomorphisms.mathieu">
   <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35" />
   <uses-feature android:name="android.hardware.touchscreen" android:required="true" />
-  <application android:hasCode="false" android:label="Mathieu" android:allowBackup="true" android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen">
+  <application android:hasCode="false" android:label="Mathieu" android:allowBackup="true" android:theme="@style/Theme.Charcoal.Mathieu">
     <activity android:name="android.app.NativeActivity" android:exported="true" android:screenOrientation="portrait" android:configChanges="orientation|screenSize|keyboardHidden|density">
       <meta-data android:name="android.app.lib_name" android:value="mathieu" />
       <intent-filter>

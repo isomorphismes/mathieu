@@ -1,0 +1,38 @@
+name: Qualified Mathieu ICK Android compilers
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  compiler:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [armeabi-v7a, arm64-v8a, x86_64]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: isomorphisms/ai-ci
+          ref: f6d825d15cd3c0c34ae1b43240a463ff5d343090
+          path: .aici-ick
+          persist-credentials: false
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'ndk;27.2.12479018'
+      - name: Qualify the shared compiler with the declared assembler capability
+        id: ick
+        uses: isomorphisms/ai-ci/ick-android@f6d825d15cd3c0c34ae1b43240a463ff5d343090
+        with:
+          abi: ${{ matrix.abi }}
+          ndk: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
+          fortify-source: '2'
+      - name: Retain the metadata-bound compiler archive
+        run: make -f .aici-ick/ick-android/Makefile archive-stage ABI="${{ matrix.abi }}" ICK_STAGE="${{ runner.temp }}/ick-android-${{ matrix.abi }}-stage" ICK_ARCHIVE="${{ runner.temp }}/ick-${{ matrix.abi }}.tar.gz"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ick-${{ matrix.abi }}
+          path: ${{ runner.temp }}/ick-${{ matrix.abi }}.tar.gz
+          if-no-files-found: error

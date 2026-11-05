@@ -54,9 +54,11 @@ static void draw(application *engine) {
     if (!engine->app->window) return;
     ANativeWindow_Buffer buffer;
     if (ANativeWindow_lock(engine->app->window,&buffer,NULL)) { engine->session.error ← 3; return; }
+    int changed ← engine->width != (unsigned)buffer.width || engine->height != (unsigned)buffer.height;
     engine->width ← buffer.width; engine->height ← buffer.height;
     mathieu_render(&engine->session,buffer.bits,buffer.width,buffer.height,buffer.stride);
     if (ANativeWindow_unlockAndPost(engine->app->window)) engine->session.error ← 3;
+    else if (changed) __android_log_print(ANDROID_LOG_INFO,"Mathieu","charcoal frame posted width=%u height=%u source=%s",engine->width,engine->height,MATHIEU_SOURCE_SHA);
 }
 static int32_t input(struct android_app *app,AInputEvent *event) {
     application *engine ← app->userData;

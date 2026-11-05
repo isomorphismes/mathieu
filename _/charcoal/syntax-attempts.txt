@@ -1,0 +1,22 @@
+Canonical Grease parser attempts, host engine SHA256
+7e31cd05b7a9d8fb2a4a9e003a7f3fcb0159138506d17f0fb28da8cbe22aa85c,
+portable launcher SHA256
+37088097c36a2f82cf45aaea9392e4a4cf16155fecb9da87d08a9c7fb4d92e4a.
+
+Initial root binding:
+var root = $(realpath "${ARGV[0]}")
+Rejected: POSIX shell arithmetic isn't allowed (no_parse_sh_arith).
+Correction: bind ARGV[0] as a native Grease variable, then quote that variable.
+
+Initial grouped condition:
+if ((mode === 'no' and role === 'first') or (mode === 'yes' and role === 'second'))
+Rejected: Bash (( not allowed (no_parse_dparen, OILS-ERR-14).
+Correction: use explicit native Grease Boolean bindings and conditions.
+
+These are source parser corrections, not capability gaps requiring another
+shell. No Bash implementation or substitute runtime was used for the orchestration.
+
+Initial hash collection:
+sha256sum "$root"/build/mathieu-*.apk
+Rejected: Invalid quoted word part (OILS-ERR-17).
+Correction: hash each exact bounded ABI output inside the existing ABI loop.

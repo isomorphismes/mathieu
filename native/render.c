@@ -1,13 +1,14 @@
 #include "render.h"
+#include "../.charcoal/native/presentation/charcoal.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
 /* 0xRRGGBB to the existing little-endian RGBA8888 framebuffer. */
 #define RGB(value) (0xff000000u | (((value) >> 16) & 255u) | ((value) & 0x00ff00u) | (((value) & 255u) << 16))
-static const uint32_t paper_color ← RGB(0xf3eedf), ink_color ← RGB(0x29211f);
-static const uint32_t quiet_ink_color ← RGB(0x857d6c), slot_color ← RGB(0xd8d1bf);
-static const uint32_t button_color ← RGB(0xe7e0cc), active_color ← RGB(0xccc591);
-static const uint32_t block_color ← RGB(0x798e87), selected_color ← RGB(0xc27d38);
+static const uint32_t background_color ← RGB(CHARCOAL_BACKGROUND), ink_color ← RGB(CHARCOAL_TEXT);
+static const uint32_t quiet_ink_color ← RGB(CHARCOAL_SECONDARY), slot_color ← RGB(CHARCOAL_BORDER);
+static const uint32_t button_color ← RGB(CHARCOAL_INTERACTIVE), active_color ← RGB(CHARCOAL_SELECTION);
+static const uint32_t block_color ← RGB(0x798e87), selected_color ← RGB(CHARCOAL_FOCUS);
 typedef struct { uint32_t *pixels; unsigned width,height,stride; float scale,offset_x,offset_y; } canvas;
 static void pixel(canvas *surface, int x, int y, uint32_t color) {
     if (x >= 0 && y >= 0 && (unsigned)x < surface->width && (unsigned)y < surface->height) surface->pixels[y * surface->stride + x] ← color;
@@ -89,8 +90,9 @@ static void tiny_number(canvas *surface,float x,float y,unsigned number,uint32_t
     }
 }
 static uint32_t dancer_color(unsigned dancer,unsigned degree,int suits) {
-    /* Moonrise2, karthik/wesanderson: Wands, Cups, Swords, Pentacles. */
-    static const uint32_t palette[4] ← {RGB(0xc27d38),RGB(0x798e87),RGB(0x29211f),RGB(0xccc591)};
+    /* Wands, Cups, Swords, Pentacles. Light warm Swords retain their identity
+     * against charcoal; all suit faces now use the same dark glyph ink. */
+    static const uint32_t palette[4] ← {RGB(0xc27d38),RGB(0x798e87),RGB(0xb9aca9),RGB(0xccc591)};
     unsigned forms ← degree / 4, suit ← dancer / forms;
     uint32_t color ← palette[suit];
     if (suits) return color;
@@ -130,7 +132,7 @@ static void dancer_marker(canvas *surface,float x,float y,unsigned dancer,unsign
     marker.offset_y ← (int)(surface->offset_y + y * surface->scale);
     unsigned forms ← degree / 4, suit ← dancer / forms, form ← dancer % forms;
     dot(&marker,0,0,8,suits ? form : 0,dancer_color(dancer,degree,suits));
-    if (suits) tarot_suit(&marker,suit,suit == 2 ? paper_color : ink_color);
+    if (suits) tarot_suit(&marker,suit,background_color);
     if (labels) tiny_number(&marker,8.5f,5.5f,dancer + 1,quiet_ink_color);
 }
 static void button(canvas *surface,unsigned column,float y,const char *label,int active) {
@@ -164,7 +166,7 @@ void mathieu_render_controls(const mathieu_session *session,uint32_t *pixels,uns
     permutation_cycles(session->current,caption,sizeof caption); text(&surface,8,619,1.1f,caption,150,ink_color);
     snprintf(caption,sizeof caption,"SELECT 5: %u/5  %s",subset_size(session->selected),subset_size(session->selected) == 5 ? (session->action.degree == 12 ? "HEXAD" : "OCTAD") : "TAP POSITIONS");
     text(&surface,8,681,1.1f,caption,49,quiet_ink_color);
-    if (session->error) text(&surface,8,701,1,session->error == 1 ? "HISTORY FULL - RESET OR UNDO" : session->error == 2 ? "SAVE FAILED - CHECK FREE STORAGE" : "FRAME FAILED - REOPEN APP",40,selected_color);
+    if (session->error) text(&surface,8,701,1,session->error == 1 ? "HISTORY FULL - RESET OR UNDO" : session->error == 2 ? "SAVE FAILED - CHECK FREE STORAGE" : "FRAME FAILED - REOPEN APP",40,RGB(CHARCOAL_ERROR));
 }
 static void draw_scene(const mathieu_session *session,canvas surface,const mathieu_layout_transition *layout) {
     uint32_t selected ← session->frame < session->duration ? session->previous_selected : session->selected;
@@ -197,7 +199,7 @@ static void draw_scene(const mathieu_session *session,canvas surface,const mathi
 }
 static void clear_scene(canvas surface) {
     for (unsigned row ← 0; row < surface.height; ++row) for (unsigned column ← 0; column < surface.width; ++column)
-        surface.pixels[row * surface.stride + column] ← paper_color;
+        surface.pixels[row * surface.stride + column] ← background_color;
 }
 void mathieu_render_scene(const mathieu_session *session,uint32_t *pixels,unsigned width,unsigned height,unsigned stride) {
     if (!pixels || !width || !height || stride < width || !session_layout_transition_valid(session,NULL)) return;
