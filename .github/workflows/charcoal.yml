@@ -9,13 +9,14 @@ on:
       - .gitmodules
       - _/charcoal/**
       - .github/workflows/charcoal.yml
+      - .github/workflows/ick-compilers.yml
   workflow_dispatch:
 permissions:
   contents: read
   actions: read
 jobs:
   compilers:
-    uses: Ashtray-Archer/utilities-android-phone-user/.github/workflows/ick-compilers.yml@7dfacda62e5b1a7b8c28925bff437602dab7e14a
+    uses: ./.github/workflows/ick-compilers.yml
   host:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -52,7 +53,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           repository: isomorphisms/ai-ci
-          ref: 4ea071a96239f3a29ca6d98454feb59947d87cfe
+          ref: f6d825d15cd3c0c34ae1b43240a463ff5d343090
           path: .aici-ick
           persist-credentials: false
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
