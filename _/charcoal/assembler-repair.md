@@ -17,3 +17,11 @@ There is no source rewriting, NDK first-party C compilation, stock compiler or
 post-processing substitute. The existing host provider already selects this
 ICK source; fresh Android and application evidence is required for the repaired
 boundary.
+
+At source 5a405cfbe3af93bd766d45c84b6e7d5fb801c6e3, run41967298674 passes the
+host suite and all three Android compiler qualifications. Actual ARMv7 app C
+compilation/linking then passes; packaging fails because the current shared
+packager requires ANDROID_GREASE explicitly. The producer now forwards its
+already verified canonical GREASE path under that existing interface. No
+alternate runtime or disabled receipt verification is introduced. Fresh package
+and Android evidence remain required.

@@ -7,6 +7,7 @@ var root = $(realpath "$supplied_root")
 var ndk = ARGV[1]
 var sdk = ARGV[2]
 var stages = ARGV[3]
+setglobal ENV.ANDROID_GREASE = ENV.GREASE
 var source = $(git -C "$root" rev-parse HEAD)
 test "$(git -C "$root/.charcoal" rev-parse HEAD)" = 3e682fb1175beef5625dbd2418730220e49fc9bd
 printf '%s  %s\n' 00ecef16e04031009904028d6c1e411110bfcc2fb8486223a7835259567a3df7 "$root/android/signing/mathieu-development.p12" | sha256sum -c -
