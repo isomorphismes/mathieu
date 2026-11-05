@@ -6,6 +6,8 @@ Checkpoints use the portable `MATHS02` format rather than a C structure dump. Th
 
 The row-major 4×6 grid is a display coordinate map, not a claim of a Miracle Octad Generator arrangement. A move sends every dancer to the exact destination in the current permutation. Cycles animate sequentially, with curved opposite directions for swaps.
 
-Package identity: `org.isomorphisms.mathieu`; launcher: Mathieu. A1 requires armeabi-v7a; C67 requires arm64-v8a. Use the maintained android-NDK NativeActivity packager. No signer is declared yet. That boundary must fail closed rather than generating a new key on each runner or silently borrowing another application's identity.
+Package identity: `org.isomorphisms.mathieu`; launcher: Mathieu. A1 requires armeabi-v7a; C67 requires arm64-v8a. Use the maintained android-NDK NativeActivity packager and the permanent public development signer documented in [signing/README.md](signing/README.md). Its certificate is `f997a30170a967e073ab47e1212a71b3967ffe2e1e88d78d659c77bf085cb3fe`; never generate a replacement or borrow another application's identity. The current versionCode is 2.
+
+The current charcoal source and build/acceptance boundary are documented in [the presentation contract](../_/charcoal/README.md). Initialize the pinned `.charcoal` submodule before compiling the native renderer.
 
 The event journal is an implementation foundation, not accepted replay/video export. Reconcile it with the existing capture branch before claiming the FP #243 contract. Export/share UI, source replay, cancelled/interrupted export tests, and actual video acceptance remain open. Host renderer tests do not establish Android window/input behavior.
